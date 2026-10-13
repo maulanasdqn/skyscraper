@@ -1,0 +1,20 @@
+[package]
+name = "skyscraper-worker"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "skyscraper-worker"
+path = "src/main.rs"
+
+[dependencies]
+skyscraper = { path = "../skyscraper-api", package = "skyscraper-api" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+sqlx = { workspace = true }
