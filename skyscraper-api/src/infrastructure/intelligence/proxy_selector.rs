@@ -3,9 +3,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use async_trait::async_trait;
+
 use crate::domain::entity::{ProxyStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
-use crate::domain::port::CarrierClient;
+use crate::domain::port::{CarrierClient, ProxySelection};
 
 pub struct ProxySelector {
     carrier_client: Arc<dyn CarrierClient>,
@@ -100,17 +102,27 @@ impl ProxySelector {
         )
     }
 
-    pub fn report_failure(&self, proxy_url: &str) {
+    pub async fn report_failure(&self, proxy_url: &str) {
         if let Some(carrier) = proxy_url
             .strip_prefix("socks5://")
             .and_then(|s| s.split('-').next())
         {
-            let tracker = self.failure_tracker.clone();
-            let carrier = carrier.to_string();
-            tokio::spawn(async move {
-                let mut map = tracker.write().await;
-                *map.entry(carrier).or_insert(0) += 1;
-            });
+            let mut map = self.failure_tracker.write().await;
+            *map.entry(carrier.to_string()).or_insert(0) += 1;
         }
+    }
+}
+
+#[async_trait]
+impl ProxySelection for ProxySelector {
+    async fn select_proxy(
+        &self,
+        request: &ScrapeJobRequest,
+    ) -> Result<Option<String>, DomainError> {
+        self.select(request).await
+    }
+
+    async fn report_proxy_failure(&self, proxy_url: &str) {
+        self.report_failure(proxy_url).await;
     }
 }

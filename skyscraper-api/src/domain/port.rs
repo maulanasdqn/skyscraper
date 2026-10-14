@@ -9,7 +9,7 @@ use super::entity::{
 use super::error::DomainError;
 use super::job_status::JobStatus;
 
-type Result<T> = std::result::Result<T, DomainError>;
+pub type Result<T> = std::result::Result<T, DomainError>;
 
 #[async_trait]
 pub trait TenantRepository: Send + Sync {
@@ -81,6 +81,42 @@ pub trait ScrapeClient: Send + Sync {
         proxy_url: Option<&str>,
     ) -> Result<ScrapeJobResult>;
     async fn list_profiles(&self) -> Result<Vec<String>>;
+}
+
+#[async_trait]
+pub trait ProxySelection: Send + Sync {
+    async fn select_proxy(&self, request: &ScrapeJobRequest) -> Result<Option<String>>;
+    async fn report_proxy_failure(&self, proxy_url: &str);
+}
+
+#[async_trait]
+pub trait ProfileSelection: Send + Sync {
+    async fn select_profile(&self, request: &ScrapeJobRequest) -> Result<String>;
+    async fn report_profile_failure(&self, profile: &str);
+}
+
+#[async_trait]
+pub trait ScrapeService: Send + Sync {
+    async fn submit_job(
+        &self,
+        tenant: &Tenant,
+        request: &ScrapeJobRequest,
+        priority: i16,
+        max_retries: i32,
+        scheduled_at: Option<DateTime<Utc>>,
+    ) -> Result<Job>;
+
+    async fn get_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<Job>;
+
+    async fn list_jobs(
+        &self,
+        tenant_id: Uuid,
+        status: Option<JobStatus>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Job>>;
+
+    async fn cancel_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<()>;
 }
 
 #[async_trait]

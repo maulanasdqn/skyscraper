@@ -14,7 +14,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::domain::port::{
-    CarrierClient, JobQueue, JobRepository, TenantRepository, UsageRepository,
+    CarrierClient, JobQueue, JobRepository, ScrapeService, TenantRepository, UsageRepository,
 };
 
 pub struct ParallaxConfig {
@@ -29,6 +29,7 @@ pub struct AppState {
     pub usage_repo: Arc<dyn UsageRepository>,
     pub queue: Arc<dyn JobQueue>,
     pub carrier_client: Arc<dyn CarrierClient>,
+    pub scrape_service: Arc<dyn ScrapeService>,
     pub parallax_config: ParallaxConfig,
     pub admin_key: String,
 }

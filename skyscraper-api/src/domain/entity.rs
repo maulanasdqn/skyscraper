@@ -18,6 +18,7 @@ pub enum TenantPlan {
 pub struct Tenant {
     pub id: Uuid,
     pub email: String,
+    #[serde(skip_serializing)]
     pub api_key: String,
     pub plan: TenantPlan,
     pub active: bool,

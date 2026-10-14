@@ -166,9 +166,7 @@ async fn proxy_auto_avoids_failed_carrier() {
         make_carrier("att", "US", true),
     ]);
 
-    // Report failure on tmobile
-    selector.report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080");
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    selector.report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080").await;
 
     let req = make_request(ProxyStrategy::Auto, ProfileStrategy::Auto, None);
     let url = selector.select(&req).await.unwrap().unwrap();
@@ -222,8 +220,7 @@ async fn profile_random_returns_valid() {
 async fn profile_auto_skips_blocked() {
     let rotator = make_rotator(vec!["win11", "macos14"]);
 
-    rotator.report_failure("win11");
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    rotator.report_failure("win11").await;
 
     let req = make_request(ProxyStrategy::None, ProfileStrategy::Auto, None);
 

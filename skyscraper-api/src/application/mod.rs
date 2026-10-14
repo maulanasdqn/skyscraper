@@ -1,1 +1,1 @@
-pub mod service;
+pub mod scrape_service;

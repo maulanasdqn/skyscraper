@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -45,6 +46,33 @@ pub struct ApiKeyResponse {
     pub api_key: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TenantCreatedResponse {
+    pub id: Uuid,
+    pub email: String,
+    pub api_key: String,
+    pub plan: TenantPlan,
+    pub active: bool,
+    pub rate_limit_rpm: i32,
+    pub concurrent_limit: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<Tenant> for TenantCreatedResponse {
+    fn from(t: Tenant) -> Self {
+        Self {
+            id: t.id,
+            email: t.email,
+            api_key: t.api_key,
+            plan: t.plan,
+            active: t.active,
+            rate_limit_rpm: t.rate_limit_rpm,
+            concurrent_limit: t.concurrent_limit,
+            created_at: t.created_at,
+        }
+    }
+}
+
 pub async fn list_tenants(
     _admin: AdminAuth,
     State(state): State<Arc<AppState>>,
@@ -59,13 +87,13 @@ pub async fn create_tenant(
     _admin: AdminAuth,
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateTenantRequest>,
-) -> ApiResult<Json<Tenant>> {
+) -> ApiResult<Json<TenantCreatedResponse>> {
     if body.email.is_empty() {
         return Err(DomainError::InvalidInput("email is required".into()).into());
     }
     let plan = body.plan.unwrap_or(TenantPlan::Free);
     let tenant = state.tenant_repo.create(&body.email, plan).await?;
-    Ok(Json(tenant))
+    Ok(Json(tenant.into()))
 }
 
 pub async fn update_tenant(

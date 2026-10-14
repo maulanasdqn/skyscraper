@@ -124,13 +124,16 @@ impl JobQueue for RedisQueue {
 
         let mut promoted = 0u64;
         for id_str in &due {
-            conn.zrem::<_, _, ()>(SCHEDULED_SET, id_str)
+            let removed: i64 = conn
+                .zrem(SCHEDULED_SET, id_str)
                 .await
                 .map_err(|e| DomainError::Upstream(format!("redis scheduled rem: {e}")))?;
-            conn.rpush::<_, _, ()>(DEFAULT_QUEUE, id_str)
-                .await
-                .map_err(|e| DomainError::Upstream(format!("redis promote push: {e}")))?;
-            promoted += 1;
+            if removed > 0 {
+                conn.rpush::<_, _, ()>(DEFAULT_QUEUE, id_str)
+                    .await
+                    .map_err(|e| DomainError::Upstream(format!("redis promote push: {e}")))?;
+                promoted += 1;
+            }
         }
 
         Ok(promoted)
@@ -151,13 +154,16 @@ impl JobQueue for RedisQueue {
 
         let mut reclaimed = 0u64;
         for id_str in &stale {
-            conn.zrem::<_, _, ()>(PROCESSING_SET, id_str)
+            let removed: i64 = conn
+                .zrem(PROCESSING_SET, id_str)
                 .await
                 .map_err(|e| DomainError::Upstream(format!("redis stale rem: {e}")))?;
-            conn.rpush::<_, _, ()>(DEFAULT_QUEUE, id_str)
-                .await
-                .map_err(|e| DomainError::Upstream(format!("redis reclaim push: {e}")))?;
-            reclaimed += 1;
+            if removed > 0 {
+                conn.rpush::<_, _, ()>(DEFAULT_QUEUE, id_str)
+                    .await
+                    .map_err(|e| DomainError::Upstream(format!("redis reclaim push: {e}")))?;
+                reclaimed += 1;
+            }
         }
 
         Ok(reclaimed)
@@ -171,16 +177,21 @@ impl JobQueue for RedisQueue {
         let key = format!("skyscraper:rate:{tenant_id}");
         let mut conn = self.conn.clone();
 
-        let count: i64 = conn
-            .incr(&key, 1)
-            .await
-            .map_err(|e| DomainError::Upstream(format!("redis rate incr: {e}")))?;
+        let script = redis::Script::new(
+            r"
+            local count = redis.call('INCR', KEYS[1])
+            if count == 1 then
+                redis.call('EXPIRE', KEYS[1], 60)
+            end
+            return count
+            ",
+        );
 
-        if count == 1 {
-            conn.expire::<_, ()>(&key, 60)
-                .await
-                .map_err(|e| DomainError::Upstream(format!("redis rate expire: {e}")))?;
-        }
+        let count: i64 = script
+            .key(&key)
+            .invoke_async(&mut conn)
+            .await
+            .map_err(|e| DomainError::Upstream(format!("redis rate limit: {e}")))?;
 
         Ok(count <= i64::from(limit_rpm))
     }

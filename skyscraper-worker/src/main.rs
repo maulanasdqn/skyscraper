@@ -11,7 +11,7 @@ use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use skyscraper::infrastructure::intelligence::proxy_selector::ProxySelector;
-use skyscraper::domain::port::JobQueue;
+use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection};
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 use skyscraper::infrastructure::queue::worker::Worker;
 
@@ -51,13 +51,14 @@ async fn main() -> Result<()> {
     let parallax_client: Arc<ParallaxClient> = Arc::new(ParallaxClient::new(&parallax_url));
     let cosmium_client: Arc<CosmiumClient> = Arc::new(CosmiumClient::new(&cosmium_url));
 
-    let proxy_selector = Arc::new(ProxySelector::new(
+    let proxy_selector: Arc<dyn ProxySelection> = Arc::new(ProxySelector::new(
         parallax_client,
         parallax_proxy_host,
         parallax_proxy_port,
         proxy_pass,
     ));
-    let profile_rotator = Arc::new(ProfileRotator::new(cosmium_client.clone()));
+    let profile_rotator: Arc<dyn ProfileSelection> =
+        Arc::new(ProfileRotator::new(cosmium_client.clone()));
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 

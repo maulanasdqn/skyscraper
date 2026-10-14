@@ -3,9 +3,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use async_trait::async_trait;
+
 use crate::domain::entity::{ProfileStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
-use crate::domain::port::ScrapeClient;
+use crate::domain::port::{ProfileSelection, ScrapeClient};
 
 pub struct ProfileRotator {
     scrape_client: Arc<dyn ScrapeClient>,
@@ -63,12 +65,22 @@ impl ProfileRotator {
         }
     }
 
-    pub fn report_failure(&self, profile: &str) {
-        let blocked = self.blocked_profiles.clone();
-        let profile = profile.to_string();
-        tokio::spawn(async move {
-            let mut set = blocked.write().await;
-            set.insert(profile);
-        });
+    pub async fn report_failure(&self, profile: &str) {
+        let mut set = self.blocked_profiles.write().await;
+        set.insert(profile.to_string());
+    }
+}
+
+#[async_trait]
+impl ProfileSelection for ProfileRotator {
+    async fn select_profile(
+        &self,
+        request: &ScrapeJobRequest,
+    ) -> Result<String, DomainError> {
+        self.select(request).await
+    }
+
+    async fn report_profile_failure(&self, profile: &str) {
+        self.report_failure(profile).await;
     }
 }

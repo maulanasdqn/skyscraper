@@ -8,6 +8,7 @@ use tracing_subscriber::EnvFilter;
 
 use skyscraper::adapter::http::{self, AppState, ParallaxConfig};
 use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsageRepository};
+use skyscraper::application::scrape_service::ScrapeServiceImpl;
 use skyscraper::domain::port::JobQueue;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
@@ -52,6 +53,7 @@ async fn main() -> Result<()> {
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
     let carrier_client = Arc::new(ParallaxClient::new(&parallax_url));
+    let scrape_service = Arc::new(ScrapeServiceImpl::new(job_repo.clone(), queue.clone()));
 
     let state = Arc::new(AppState {
         tenant_repo,
@@ -59,6 +61,7 @@ async fn main() -> Result<()> {
         usage_repo,
         queue,
         carrier_client,
+        scrape_service,
         parallax_config: ParallaxConfig {
             proxy_host: parallax_proxy_host,
             proxy_port: parallax_proxy_port,

@@ -12,13 +12,6 @@ use crate::domain::entity::Tenant;
 
 pub struct AuthenticatedTenant(pub Tenant);
 
-impl std::ops::Deref for AuthenticatedTenant {
-    type Target = Tenant;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 enum AuthError {
     MissingKey,
     InvalidKey,
@@ -68,6 +61,16 @@ impl FromRequestParts<Arc<AppState>> for AuthenticatedTenant {
 
 pub struct AdminAuth;
 
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter()
+        .zip(b.iter())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
 impl FromRequestParts<Arc<AppState>> for AdminAuth {
     type Rejection = Response;
 
@@ -81,7 +84,7 @@ impl FromRequestParts<Arc<AppState>> for AdminAuth {
             .and_then(|v| v.to_str().ok())
             .ok_or_else(|| AuthError::MissingKey.into_response())?;
 
-        if api_key != state.admin_key {
+        if !constant_time_eq(api_key.as_bytes(), state.admin_key.as_bytes()) {
             return Err(AuthError::InvalidKey.into_response());
         }
 

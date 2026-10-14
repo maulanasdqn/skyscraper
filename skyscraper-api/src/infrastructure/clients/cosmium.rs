@@ -32,8 +32,8 @@ struct CosmiumScrapeRequest<'a> {
     extract: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
     script: &'a Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    workflow: &'a Vec<WorkflowStep>,
+    #[serde(skip_serializing_if = "<[WorkflowStep]>::is_empty")]
+    workflow: &'a [WorkflowStep],
     #[serde(skip_serializing_if = "Option::is_none")]
     proxy: Option<&'a str>,
     include_html: bool,

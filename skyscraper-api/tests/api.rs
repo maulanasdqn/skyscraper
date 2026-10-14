@@ -17,7 +17,7 @@ use skyscraper::domain::entity::{
 use skyscraper::domain::error::DomainError;
 use skyscraper::domain::job_status::JobStatus;
 use skyscraper::domain::port::{
-    CarrierClient, JobQueue, JobRepository, TenantRepository, UsageRepository,
+    CarrierClient, JobQueue, JobRepository, ScrapeService, TenantRepository, UsageRepository,
 };
 
 // --- Mock implementations ---
@@ -350,6 +350,82 @@ impl JobQueue for MockJobQueue {
     }
 }
 
+struct MockScrapeService {
+    job_repo: Arc<MockJobRepository>,
+    queue: Arc<MockJobQueue>,
+}
+
+#[async_trait]
+impl ScrapeService for MockScrapeService {
+    async fn submit_job(
+        &self,
+        tenant: &Tenant,
+        request: &ScrapeJobRequest,
+        priority: i16,
+        max_retries: i32,
+        scheduled_at: Option<DateTime<Utc>>,
+    ) -> Result<Job, DomainError> {
+        if request.url.is_empty() {
+            return Err(DomainError::InvalidInput("url is required".into()));
+        }
+
+        let allowed = self
+            .queue
+            .check_rate_limit(&tenant.id, tenant.rate_limit_rpm)
+            .await?;
+        if !allowed {
+            return Err(DomainError::RateLimitExceeded);
+        }
+
+        let job = self
+            .job_repo
+            .create(tenant.id, request, priority, max_retries, scheduled_at)
+            .await?;
+
+        if let Some(sa) = job.scheduled_at {
+            self.queue.schedule(job.id, sa.timestamp() as f64).await?;
+        } else {
+            self.queue.enqueue(job.id, priority).await?;
+        }
+
+        Ok(job)
+    }
+
+    async fn get_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<Job, DomainError> {
+        let job = self
+            .job_repo
+            .find_by_id(job_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("job not found".into()))?;
+        if job.tenant_id != tenant_id {
+            return Err(DomainError::NotFound("job not found".into()));
+        }
+        Ok(job)
+    }
+
+    async fn list_jobs(
+        &self,
+        tenant_id: Uuid,
+        status: Option<JobStatus>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Job>, DomainError> {
+        self.job_repo
+            .list_by_tenant(tenant_id, status, limit, offset)
+            .await
+    }
+
+    async fn cancel_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<(), DomainError> {
+        let job = self.get_job(tenant_id, job_id).await?;
+        if job.status != JobStatus::Pending && job.status != JobStatus::Scheduled {
+            return Err(DomainError::InvalidInput(
+                "can only cancel pending or scheduled jobs".into(),
+            ));
+        }
+        self.job_repo.delete(job_id).await
+    }
+}
+
 struct MockCarrierClient;
 
 #[async_trait]
@@ -388,12 +464,19 @@ fn test_app_with_tenant(tenant: Tenant) -> Router {
 }
 
 fn test_app_with_tenant_repo(tenant_repo: Arc<MockTenantRepository>) -> Router {
+    let job_repo = Arc::new(MockJobRepository::new());
+    let queue = Arc::new(MockJobQueue::new());
+    let scrape_service = Arc::new(MockScrapeService {
+        job_repo: job_repo.clone(),
+        queue: queue.clone(),
+    });
     let state = Arc::new(AppState {
         tenant_repo,
-        job_repo: Arc::new(MockJobRepository::new()),
+        job_repo,
         usage_repo: Arc::new(MockUsageRepository),
-        queue: Arc::new(MockJobQueue::new()),
+        queue,
         carrier_client: Arc::new(MockCarrierClient),
+        scrape_service,
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),
             proxy_port: 1080,
@@ -665,12 +748,18 @@ async fn create_job_and_list() {
     let tenant_repo = Arc::new(MockTenantRepository::with_tenant(tenant));
     let job_repo = Arc::new(MockJobRepository::new());
 
+    let queue = Arc::new(MockJobQueue::new());
+    let scrape_service = Arc::new(MockScrapeService {
+        job_repo: job_repo.clone(),
+        queue: queue.clone(),
+    });
     let state = Arc::new(AppState {
         tenant_repo,
         job_repo: job_repo.clone(),
         usage_repo: Arc::new(MockUsageRepository),
-        queue: Arc::new(MockJobQueue::new()),
+        queue,
         carrier_client: Arc::new(MockCarrierClient),
+        scrape_service,
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),
             proxy_port: 1080,
@@ -747,12 +836,18 @@ async fn cancel_pending_job() {
     let tenant_repo = Arc::new(MockTenantRepository::with_tenant(tenant));
     let job_repo = Arc::new(MockJobRepository::new());
 
+    let queue = Arc::new(MockJobQueue::new());
+    let scrape_service = Arc::new(MockScrapeService {
+        job_repo: job_repo.clone(),
+        queue: queue.clone(),
+    });
     let state = Arc::new(AppState {
         tenant_repo,
         job_repo: job_repo.clone(),
         usage_repo: Arc::new(MockUsageRepository),
-        queue: Arc::new(MockJobQueue::new()),
+        queue,
         carrier_client: Arc::new(MockCarrierClient),
+        scrape_service,
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),
             proxy_port: 1080,

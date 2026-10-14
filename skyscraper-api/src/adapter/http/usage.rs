@@ -31,7 +31,7 @@ pub async fn get_usage(
 
     let total_bytes = state
         .usage_repo
-        .total_for_tenant(tenant.id, period_start)
+        .total_for_tenant(tenant.0.id, period_start)
         .await?;
 
     Ok(Json(UsageSummary {
