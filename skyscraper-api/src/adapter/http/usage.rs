@@ -22,12 +22,9 @@ pub async fn get_usage(
 ) -> ApiResult<Json<UsageSummary>> {
     let now = Utc::now();
     let naive = now.date_naive();
-    let first_of_month = chrono::NaiveDate::from_ymd_opt(naive.year(), naive.month(), 1)
-        .unwrap_or(naive);
-    let period_start = first_of_month
-        .and_hms_opt(0, 0, 0)
-        .unwrap()
-        .and_utc();
+    let first_of_month =
+        chrono::NaiveDate::from_ymd_opt(naive.year(), naive.month(), 1).unwrap_or(naive);
+    let period_start = first_of_month.and_hms_opt(0, 0, 0).unwrap().and_utc();
 
     let total_bytes = state
         .usage_repo

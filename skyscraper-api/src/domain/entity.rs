@@ -77,10 +77,20 @@ fn default_wait_ms() -> u32 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WorkflowStep {
-    Click { selector: String },
-    Delay { duration_ms: u32 },
-    Extract { name: String, selector: String, limit: Option<u32> },
-    Script { code: String },
+    Click {
+        selector: String,
+    },
+    Delay {
+        duration_ms: u32,
+    },
+    Extract {
+        name: String,
+        selector: String,
+        limit: Option<u32>,
+    },
+    Script {
+        code: String,
+    },
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -88,7 +98,9 @@ pub enum WorkflowStep {
 pub enum ProxyStrategy {
     #[default]
     Auto,
-    Carrier { name: String },
+    Carrier {
+        name: String,
+    },
     None,
 }
 
@@ -97,7 +109,9 @@ pub enum ProxyStrategy {
 pub enum ProfileStrategy {
     #[default]
     Auto,
-    Named { name: String },
+    Named {
+        name: String,
+    },
     Random,
 }
 

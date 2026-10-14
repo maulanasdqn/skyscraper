@@ -23,12 +23,7 @@ fn map_sqlx_error(e: sqlx::Error) -> DomainError {
 
 #[async_trait]
 impl UsageRepository for PgUsageRepository {
-    async fn record(
-        &self,
-        tenant_id: Uuid,
-        job_id: Uuid,
-        bytes: i64,
-    ) -> Result<(), DomainError> {
+    async fn record(&self, tenant_id: Uuid, job_id: Uuid, bytes: i64) -> Result<(), DomainError> {
         sqlx::query(
             "INSERT INTO usage_records (tenant_id, job_id, bytes_consumed) \
              VALUES ($1, $2, $3)",

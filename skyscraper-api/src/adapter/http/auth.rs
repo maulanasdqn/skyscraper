@@ -91,3 +91,33 @@ impl FromRequestParts<Arc<AppState>> for AdminAuth {
         Ok(Self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::constant_time_eq;
+
+    #[test]
+    fn constant_time_eq_same_strings() {
+        assert!(constant_time_eq(b"hello", b"hello"));
+    }
+
+    #[test]
+    fn constant_time_eq_different_strings() {
+        assert!(!constant_time_eq(b"hello", b"world"));
+    }
+
+    #[test]
+    fn constant_time_eq_different_lengths() {
+        assert!(!constant_time_eq(b"hi", b"hello"));
+    }
+
+    #[test]
+    fn constant_time_eq_empty_strings() {
+        assert!(constant_time_eq(b"", b""));
+    }
+
+    #[test]
+    fn constant_time_eq_one_byte_diff() {
+        assert!(!constant_time_eq(b"abc", b"abd"));
+    }
+}

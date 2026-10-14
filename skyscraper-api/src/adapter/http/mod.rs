@@ -36,7 +36,10 @@ pub struct AppState {
 
 pub fn router(state: Arc<AppState>) -> Router {
     let admin_routes = Router::new()
-        .route("/tenants", get(tenants::list_tenants).post(tenants::create_tenant))
+        .route(
+            "/tenants",
+            get(tenants::list_tenants).post(tenants::create_tenant),
+        )
         .route("/tenants/{id}", patch(tenants::update_tenant))
         .route(
             "/tenants/{id}/regenerate-key",

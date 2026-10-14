@@ -33,10 +33,7 @@ impl ProxySelector {
         }
     }
 
-    pub async fn select(
-        &self,
-        request: &ScrapeJobRequest,
-    ) -> Result<Option<String>, DomainError> {
+    pub async fn select(&self, request: &ScrapeJobRequest) -> Result<Option<String>, DomainError> {
         match &request.proxy_strategy {
             ProxyStrategy::None => Ok(None),
             ProxyStrategy::Carrier { name } => {
@@ -44,9 +41,7 @@ impl ProxySelector {
                 let carrier = carriers
                     .iter()
                     .find(|c| c.name.eq_ignore_ascii_case(name))
-                    .ok_or_else(|| {
-                        DomainError::NotFound(format!("carrier '{name}' not found"))
-                    })?;
+                    .ok_or_else(|| DomainError::NotFound(format!("carrier '{name}' not found")))?;
                 if !carrier.online {
                     return Err(DomainError::Upstream(format!(
                         "carrier '{name}' is offline"
@@ -58,9 +53,7 @@ impl ProxySelector {
                 let carriers = self.carrier_client.list_carriers().await?;
                 let online: Vec<_> = carriers.iter().filter(|c| c.online).collect();
                 if online.is_empty() {
-                    return Err(DomainError::Upstream(
-                        "no online carriers available".into(),
-                    ));
+                    return Err(DomainError::Upstream("no online carriers available".into()));
                 }
 
                 let geo_filtered: Vec<_> = if let Some(ref geo) = request.geo {

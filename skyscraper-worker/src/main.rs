@@ -7,11 +7,11 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use skyscraper::adapter::postgres::{PgJobRepository, PgUsageRepository};
+use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection};
 use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use skyscraper::infrastructure::intelligence::proxy_selector::ProxySelector;
-use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection};
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 use skyscraper::infrastructure::queue::worker::Worker;
 

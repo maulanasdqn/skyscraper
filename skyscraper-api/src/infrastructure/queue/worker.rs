@@ -96,13 +96,20 @@ impl Worker {
     ) -> Result<(), DomainError> {
         let attempts = job.attempts + 1;
         if attempts < job.max_retries {
-            self.job_repo.set_failed(job_id, error_msg, attempts).await?;
+            self.job_repo
+                .set_failed(job_id, error_msg, attempts)
+                .await?;
             self.job_repo.set_status(job_id, JobStatus::Pending).await?;
             self.queue.ack(job_id).await?;
             self.queue.enqueue(job_id, job.priority).await?;
-            warn!("job {job_id} failed ({error_msg}), retry {attempts}/{}", job.max_retries);
+            warn!(
+                "job {job_id} failed ({error_msg}), retry {attempts}/{}",
+                job.max_retries
+            );
         } else {
-            self.job_repo.set_failed(job_id, error_msg, attempts).await?;
+            self.job_repo
+                .set_failed(job_id, error_msg, attempts)
+                .await?;
             self.job_repo.set_status(job_id, JobStatus::Failed).await?;
             self.queue.move_to_dead(job_id).await?;
             error!("job {job_id} failed permanently: {error_msg}");
@@ -129,9 +136,7 @@ impl Worker {
         let proxy_url = self.proxy_selector.select_proxy(&request).await?;
         let profile = self.profile_rotator.select_profile(&request).await?;
 
-        self.job_repo
-            .set_running(job_id, None, &profile)
-            .await?;
+        self.job_repo.set_running(job_id, None, &profile).await?;
 
         match self
             .scrape_client
@@ -150,7 +155,8 @@ impl Worker {
                     self.proxy_selector.report_proxy_failure(proxy).await;
                 }
                 self.profile_rotator.report_profile_failure(&profile).await;
-                self.handle_failure(job_id, &job, "blocked by target site").await?;
+                self.handle_failure(job_id, &job, "blocked by target site")
+                    .await?;
             }
             Err(e) => {
                 self.handle_failure(job_id, &job, &e.to_string()).await?;

@@ -76,7 +76,13 @@ pub async fn create_job(
 ) -> ApiResult<(StatusCode, Json<Job>)> {
     let job = state
         .scrape_service
-        .submit_job(&tenant.0, &body.scrape, body.priority, body.max_retries, body.scheduled_at)
+        .submit_job(
+            &tenant.0,
+            &body.scrape,
+            body.priority,
+            body.max_retries,
+            body.scheduled_at,
+        )
         .await?;
 
     Ok((StatusCode::CREATED, Json(job)))
@@ -90,11 +96,16 @@ pub async fn scrape_sync(
 ) -> Result<impl IntoResponse, ApiError> {
     let job = state
         .scrape_service
-        .submit_job(&tenant.0, &body.scrape, body.priority, body.max_retries, body.scheduled_at)
+        .submit_job(
+            &tenant.0,
+            &body.scrape,
+            body.priority,
+            body.max_retries,
+            body.scheduled_at,
+        )
         .await?;
 
-    let deadline =
-        tokio::time::Instant::now() + std::time::Duration::from_millis(query.timeout_ms);
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(query.timeout_ms);
     let mut poll_interval = std::time::Duration::from_millis(100);
     let max_interval = std::time::Duration::from_secs(2);
 

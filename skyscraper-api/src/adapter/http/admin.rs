@@ -20,7 +20,9 @@ pub async fn retry_dead(
     _admin: AdminAuth,
     State(_state): State<Arc<AppState>>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({ "message": "not yet implemented" })))
+    Ok(Json(
+        serde_json::json!({ "message": "not yet implemented" }),
+    ))
 }
 
 pub async fn list_carriers(

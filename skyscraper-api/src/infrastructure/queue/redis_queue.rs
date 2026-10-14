@@ -49,11 +49,7 @@ impl JobQueue for RedisQueue {
         Ok(())
     }
 
-    async fn schedule(
-        &self,
-        job_id: Uuid,
-        run_at_epoch: f64,
-    ) -> Result<(), DomainError> {
+    async fn schedule(&self, job_id: Uuid, run_at_epoch: f64) -> Result<(), DomainError> {
         let mut conn = self.conn.clone();
         conn.zadd::<_, _, _, ()>(SCHEDULED_SET, job_id.to_string(), run_at_epoch)
             .await

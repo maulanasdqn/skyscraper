@@ -166,7 +166,9 @@ async fn proxy_auto_avoids_failed_carrier() {
         make_carrier("att", "US", true),
     ]);
 
-    selector.report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080").await;
+    selector
+        .report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080")
+        .await;
 
     let req = make_request(ProxyStrategy::Auto, ProfileStrategy::Auto, None);
     let url = selector.select(&req).await.unwrap().unwrap();

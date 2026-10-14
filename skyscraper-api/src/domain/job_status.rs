@@ -17,7 +17,10 @@ impl JobStatus {
         matches!(
             (self, next),
             (Self::Pending, Self::Running)
-                | (Self::Scheduled | Self::Running | Self::Failed | Self::Dead, Self::Pending)
+                | (
+                    Self::Scheduled | Self::Running | Self::Failed | Self::Dead,
+                    Self::Pending
+                )
                 | (Self::Running, Self::Completed | Self::Failed)
                 | (Self::Failed, Self::Dead)
         )

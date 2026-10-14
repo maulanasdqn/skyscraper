@@ -24,10 +24,7 @@ impl ProfileRotator {
         }
     }
 
-    pub async fn select(
-        &self,
-        request: &ScrapeJobRequest,
-    ) -> Result<String, DomainError> {
+    pub async fn select(&self, request: &ScrapeJobRequest) -> Result<String, DomainError> {
         match &request.profile_strategy {
             ProfileStrategy::Named { name } => Ok(name.clone()),
             ProfileStrategy::Random => {
@@ -45,10 +42,7 @@ impl ProfileRotator {
                 }
 
                 let blocked = self.blocked_profiles.read().await;
-                let available: Vec<_> = profiles
-                    .iter()
-                    .filter(|p| !blocked.contains(*p))
-                    .collect();
+                let available: Vec<_> = profiles.iter().filter(|p| !blocked.contains(*p)).collect();
 
                 let pool = if available.is_empty() {
                     &profiles
@@ -73,10 +67,7 @@ impl ProfileRotator {
 
 #[async_trait]
 impl ProfileSelection for ProfileRotator {
-    async fn select_profile(
-        &self,
-        request: &ScrapeJobRequest,
-    ) -> Result<String, DomainError> {
+    async fn select_profile(&self, request: &ScrapeJobRequest) -> Result<String, DomainError> {
         self.select(request).await
     }
 

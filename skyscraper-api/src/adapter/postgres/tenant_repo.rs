@@ -81,14 +81,12 @@ impl TenantRepository for PgTenantRepository {
     }
 
     async fn update_plan(&self, id: Uuid, plan: TenantPlan) -> Result<(), DomainError> {
-        let result = sqlx::query(
-            "UPDATE tenants SET plan = $1::tenant_plan WHERE id = $2",
-        )
-        .bind(&plan)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let result = sqlx::query("UPDATE tenants SET plan = $1::tenant_plan WHERE id = $2")
+            .bind(&plan)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("tenant {id}")));
@@ -126,14 +124,12 @@ impl TenantRepository for PgTenantRepository {
 
     async fn regenerate_api_key(&self, id: Uuid) -> Result<String, DomainError> {
         let new_key = format!("sk_{}", Uuid::new_v4());
-        let result = sqlx::query(
-            "UPDATE tenants SET api_key = $1 WHERE id = $2",
-        )
-        .bind(&new_key)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let result = sqlx::query("UPDATE tenants SET api_key = $1 WHERE id = $2")
+            .bind(&new_key)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("tenant {id}")));

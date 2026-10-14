@@ -109,7 +109,11 @@ pub async fn update_tenant(
         state.tenant_repo.set_active(id, active).await?;
     }
     if let Some(ref url) = body.webhook_url {
-        let url_opt = if url.is_empty() { None } else { Some(url.as_str()) };
+        let url_opt = if url.is_empty() {
+            None
+        } else {
+            Some(url.as_str())
+        };
         state.tenant_repo.set_webhook_url(id, url_opt).await?;
     }
     Ok(Json(serde_json::json!({ "updated": true })))

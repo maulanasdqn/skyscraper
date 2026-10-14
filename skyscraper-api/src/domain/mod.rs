@@ -94,12 +94,15 @@ mod tests {
             assert_eq!(req.wait_ms, 5000);
             assert!(req.headful);
             assert_eq!(req.geo.as_deref(), Some("US"));
-            assert!(matches!(req.proxy_strategy, ProxyStrategy::Carrier { ref name } if name == "tmobile"));
-            assert!(matches!(req.profile_strategy, ProfileStrategy::Named { ref name } if name == "win11_rtx"));
+            assert!(
+                matches!(req.proxy_strategy, ProxyStrategy::Carrier { ref name } if name == "tmobile")
+            );
+            assert!(
+                matches!(req.profile_strategy, ProfileStrategy::Named { ref name } if name == "win11_rtx")
+            );
 
             let serialized = serde_json::to_value(&req).unwrap();
-            let deserialized: ScrapeJobRequest =
-                serde_json::from_value(serialized).unwrap();
+            let deserialized: ScrapeJobRequest = serde_json::from_value(serialized).unwrap();
             assert_eq!(deserialized.url, req.url);
             assert_eq!(deserialized.wait_ms, req.wait_ms);
         }
@@ -126,8 +129,7 @@ mod tests {
                 serde_json::from_str(r#"{"type":"named","name":"chrome_mac"}"#).unwrap();
             assert!(matches!(named, ProfileStrategy::Named { ref name } if name == "chrome_mac"));
 
-            let random: ProfileStrategy =
-                serde_json::from_str(r#"{"type":"random"}"#).unwrap();
+            let random: ProfileStrategy = serde_json::from_str(r#"{"type":"random"}"#).unwrap();
             assert!(matches!(random, ProfileStrategy::Random));
         }
 

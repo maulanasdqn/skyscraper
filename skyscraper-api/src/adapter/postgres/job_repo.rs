@@ -179,14 +179,12 @@ impl JobRepository for PgJobRepository {
     }
 
     async fn set_status(&self, id: Uuid, status: JobStatus) -> Result<(), DomainError> {
-        let affected = sqlx::query(
-            "UPDATE jobs SET status = $1::job_status WHERE id = $2",
-        )
-        .bind(status)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let affected = sqlx::query("UPDATE jobs SET status = $1::job_status WHERE id = $2")
+            .bind(status)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
 
         if affected.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("job {id}")));

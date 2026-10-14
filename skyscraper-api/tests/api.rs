@@ -182,7 +182,7 @@ impl JobRepository for MockJobRepository {
         Ok(jobs
             .iter()
             .filter(|j| j.tenant_id == tenant_id)
-            .filter(|j| status.map_or(true, |s| j.status == s))
+            .filter(|j| status.is_none_or(|s| j.status == s))
             .skip(offset as usize)
             .take(limit as usize)
             .cloned()
@@ -264,7 +264,12 @@ struct MockUsageRepository;
 
 #[async_trait]
 impl UsageRepository for MockUsageRepository {
-    async fn record(&self, _tenant_id: Uuid, _job_id: Uuid, _bytes: i64) -> Result<(), DomainError> {
+    async fn record(
+        &self,
+        _tenant_id: Uuid,
+        _job_id: Uuid,
+        _bytes: i64,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -625,7 +630,7 @@ async fn admin_update_tenant() {
         .oneshot(
             Request::builder()
                 .method("PATCH")
-                .uri(&format!("/api/v1/admin/tenants/{id}"))
+                .uri(format!("/api/v1/admin/tenants/{id}"))
                 .header("x-api-key", "admin_test_key")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"active": false}"#))
@@ -649,7 +654,7 @@ async fn admin_regenerate_key() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/api/v1/admin/tenants/{id}/regenerate-key"))
+                .uri(format!("/api/v1/admin/tenants/{id}/regenerate-key"))
                 .header("x-api-key", "admin_test_key")
                 .body(Body::empty())
                 .unwrap(),
@@ -729,7 +734,7 @@ async fn get_job_not_found() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/jobs/{fake_id}"))
+                .uri(format!("/api/v1/jobs/{fake_id}"))
                 .header("x-api-key", &api_key)
                 .body(Body::empty())
                 .unwrap(),
@@ -777,7 +782,9 @@ async fn create_job_and_list() {
                 .uri("/api/v1/jobs")
                 .header("x-api-key", &api_key)
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"url": "https://example.com", "extract": [".title"]}"#))
+                .body(Body::from(
+                    r#"{"url": "https://example.com", "extract": [".title"]}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -879,7 +886,7 @@ async fn cancel_pending_job() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/v1/jobs/{job_id}"))
+                .uri(format!("/api/v1/jobs/{job_id}"))
                 .header("x-api-key", &api_key)
                 .body(Body::empty())
                 .unwrap(),
