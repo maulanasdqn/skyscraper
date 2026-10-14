@@ -166,18 +166,28 @@ pub async fn create_batch(
         return Err(DomainError::InvalidInput("max 100 jobs per batch".into()).into());
     }
 
-    let mut job_ids = Vec::with_capacity(body.jobs.len());
-    for item in &body.jobs {
-        let job = state
-            .scrape_service
-            .submit_job(
-                &tenant.0,
+    let mut handles = Vec::with_capacity(body.jobs.len());
+    for item in body.jobs {
+        let svc = state.scrape_service.clone();
+        let t = tenant.0.clone();
+        handles.push(tokio::spawn(async move {
+            svc.submit_job(
+                &t,
                 &item.scrape,
                 item.priority,
                 item.max_retries,
                 item.scheduled_at,
             )
-            .await?;
+            .await
+        }));
+    }
+
+    let mut job_ids = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let job = handle
+            .await
+            .map_err(|e| DomainError::Internal(anyhow::anyhow!("batch task panicked: {e}")))?
+            .map_err(ApiError::from)?;
         job_ids.push(job.id);
     }
 

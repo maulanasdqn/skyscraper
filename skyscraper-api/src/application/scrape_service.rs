@@ -8,6 +8,7 @@ use crate::domain::entity::{Job, ScrapeJobRequest, Tenant};
 use crate::domain::error::DomainError;
 use crate::domain::job_status::JobStatus;
 use crate::domain::port::{JobQueue, JobRepository, ScrapeService};
+use crate::domain::validation::validate_scrape_url;
 
 pub struct ScrapeServiceImpl {
     job_repo: Arc<dyn JobRepository>,
@@ -41,9 +42,7 @@ impl ScrapeService for ScrapeServiceImpl {
         max_retries: i32,
         scheduled_at: Option<DateTime<Utc>>,
     ) -> Result<Job, DomainError> {
-        if request.url.is_empty() {
-            return Err(DomainError::InvalidInput("url is required".into()));
-        }
+        validate_scrape_url(&request.url)?;
 
         let allowed = self
             .queue
@@ -457,6 +456,30 @@ mod tests {
         });
 
         let err = svc.cancel_job(tenant.id, job.id).await.unwrap_err();
+        assert!(matches!(err, DomainError::InvalidInput(_)));
+    }
+
+    #[tokio::test]
+    async fn submit_job_private_ip_rejected() {
+        let (svc, _queue, _repo) = make_service(true, 0);
+        let tenant = test_tenant();
+
+        let req = test_request("http://127.0.0.1/admin");
+        let err = svc.submit_job(&tenant, &req, 5, 2, None).await.unwrap_err();
+        assert!(matches!(err, DomainError::InvalidInput(_)));
+
+        let req = test_request("http://10.0.0.1:8080");
+        let err = svc.submit_job(&tenant, &req, 5, 2, None).await.unwrap_err();
+        assert!(matches!(err, DomainError::InvalidInput(_)));
+    }
+
+    #[tokio::test]
+    async fn submit_job_invalid_scheme_rejected() {
+        let (svc, _queue, _repo) = make_service(true, 0);
+        let tenant = test_tenant();
+        let req = test_request("ftp://example.com/file");
+
+        let err = svc.submit_job(&tenant, &req, 5, 2, None).await.unwrap_err();
         assert!(matches!(err, DomainError::InvalidInput(_)));
     }
 

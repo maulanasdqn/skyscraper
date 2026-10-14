@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::watch;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -11,6 +12,8 @@ use crate::domain::port::{
     TenantRepository, UsageRepository,
 };
 use crate::infrastructure::webhook::WebhookDelivery;
+
+const JOB_TIMEOUT: Duration = Duration::from_mins(2);
 
 pub struct Worker {
     queue: Arc<dyn JobQueue>,
@@ -210,11 +213,24 @@ impl Worker {
 
         self.job_repo.set_running(job_id, None, &profile).await?;
 
-        match self
-            .scrape_client
-            .scrape(&request.url, &profile, &request, proxy_url.as_deref())
-            .await
-        {
+        let scrape_result = tokio::time::timeout(
+            JOB_TIMEOUT,
+            self.scrape_client
+                .scrape(&request.url, &profile, &request, proxy_url.as_deref()),
+        )
+        .await;
+
+        let scrape_result = if let Ok(inner) = scrape_result {
+            inner
+        } else {
+            warn!("job {job_id} timed out after {}s", JOB_TIMEOUT.as_secs());
+            Err(DomainError::Upstream(format!(
+                "job timed out after {}s",
+                JOB_TIMEOUT.as_secs()
+            )))
+        };
+
+        match scrape_result {
             Ok(result) => {
                 let bytes = result.html_length as i64;
                 self.job_repo.set_completed(job_id, &result).await?;

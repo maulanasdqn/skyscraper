@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use axum::routing::{get, patch, post};
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
@@ -65,6 +66,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/health/ready", get(health::readiness))
         .nest("/api/v1/admin", admin_routes)
         .nest("/api/v1", authenticated_routes)
+        .layer(CompressionLayer::new())
         .layer(axum::middleware::from_fn(middleware::request_id))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
