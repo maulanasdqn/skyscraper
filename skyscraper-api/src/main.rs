@@ -74,7 +74,30 @@ async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(listen).await?;
 
     info!("skyscraper-api listening on {listen}");
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("skyscraper-api shut down cleanly");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = tokio::signal::ctrl_c();
+
+    #[cfg(unix)]
+    {
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler");
+        tokio::select! {
+            _ = ctrl_c => info!("received SIGINT, starting graceful shutdown"),
+            _ = sigterm.recv() => info!("received SIGTERM, starting graceful shutdown"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await.ok();
+        info!("received SIGINT, starting graceful shutdown");
+    }
 }

@@ -2,17 +2,20 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::warn;
 
 use crate::domain::entity::{ScrapeJobRequest, ScrapeJobResult, WorkflowStep};
 use crate::domain::error::DomainError;
 use crate::domain::port::ScrapeClient;
+use crate::infrastructure::circuit_breaker::CircuitBreaker;
 
 pub struct CosmiumClient {
     client: Client,
     base_url: String,
     profile_cache: Arc<RwLock<Option<CachedProfiles>>>,
+    circuit_breaker: CircuitBreaker,
 }
 
 struct CachedProfiles {
@@ -20,7 +23,7 @@ struct CachedProfiles {
     fetched_at: std::time::Instant,
 }
 
-const PROFILE_CACHE_TTL: std::time::Duration = std::time::Duration::from_mins(1);
+const PROFILE_CACHE_TTL: Duration = Duration::from_mins(1);
 
 #[derive(Serialize)]
 struct CosmiumScrapeRequest<'a> {
@@ -66,10 +69,20 @@ struct CosmiumScrapeResponse {
 
 impl CosmiumClient {
     pub fn new(base_url: &str) -> Self {
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(90))
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Duration::from_secs(30))
+            .tcp_keepalive(Duration::from_secs(15))
+            .build()
+            .expect("failed to build cosmium http client");
+
         Self {
-            client: Client::new(),
+            client,
             base_url: base_url.trim_end_matches('/').to_string(),
             profile_cache: Arc::new(RwLock::new(None)),
+            circuit_breaker: CircuitBreaker::new("cosmium", 5, Duration::from_secs(30)),
         }
     }
 }
@@ -83,6 +96,13 @@ impl ScrapeClient for CosmiumClient {
         request: &ScrapeJobRequest,
         proxy_url: Option<&str>,
     ) -> Result<ScrapeJobResult, DomainError> {
+        if !self.circuit_breaker.is_call_permitted() {
+            return Err(DomainError::Upstream(format!(
+                "circuit breaker '{}' is open — cosmium appears down",
+                self.circuit_breaker.name()
+            )));
+        }
+
         let body = CosmiumScrapeRequest {
             url,
             profile,
@@ -104,11 +124,17 @@ impl ScrapeClient for CosmiumClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| DomainError::Upstream(format!("cosmium: {e}")))?;
+            .map_err(|e| {
+                self.circuit_breaker.record_failure();
+                DomainError::Upstream(format!("cosmium: {e}"))
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
+            if status.is_server_error() {
+                self.circuit_breaker.record_failure();
+            }
             return Err(DomainError::Upstream(format!(
                 "cosmium returned {status}: {text}"
             )));
@@ -120,8 +146,11 @@ impl ScrapeClient for CosmiumClient {
             .map_err(|e| DomainError::Upstream(format!("cosmium decode: {e}")))?;
 
         if result.blocked {
+            self.circuit_breaker.record_success();
             return Err(DomainError::ScrapeBlocked);
         }
+
+        self.circuit_breaker.record_success();
 
         Ok(ScrapeJobResult {
             final_url: result.final_url,

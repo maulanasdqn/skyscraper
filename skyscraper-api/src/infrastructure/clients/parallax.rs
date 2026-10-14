@@ -1,17 +1,20 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::warn;
 
 use crate::domain::entity::CarrierInfo;
 use crate::domain::error::DomainError;
 use crate::domain::port::CarrierClient;
+use crate::infrastructure::circuit_breaker::CircuitBreaker;
 
 pub struct ParallaxClient {
     client: Client,
     base_url: String,
     cache: Arc<RwLock<Option<CachedCarriers>>>,
+    circuit_breaker: CircuitBreaker,
 }
 
 struct CachedCarriers {
@@ -19,31 +22,54 @@ struct CachedCarriers {
     fetched_at: std::time::Instant,
 }
 
-const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+const CACHE_TTL: Duration = Duration::from_secs(30);
 
 impl ParallaxClient {
     pub fn new(base_url: &str) -> Self {
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(15))
+            .pool_max_idle_per_host(5)
+            .pool_idle_timeout(Duration::from_secs(30))
+            .tcp_keepalive(Duration::from_secs(15))
+            .build()
+            .expect("failed to build parallax http client");
+
         Self {
-            client: Client::new(),
+            client,
             base_url: base_url.trim_end_matches('/').to_string(),
             cache: Arc::new(RwLock::new(None)),
+            circuit_breaker: CircuitBreaker::new("parallax", 5, Duration::from_secs(30)),
         }
     }
 
     async fn fetch_carriers(&self) -> Result<Vec<CarrierInfo>, DomainError> {
+        if !self.circuit_breaker.is_call_permitted() {
+            return Err(DomainError::Upstream(format!(
+                "circuit breaker '{}' is open — parallax appears down",
+                self.circuit_breaker.name()
+            )));
+        }
+
         let resp = self
             .client
             .get(format!("{}/api/carriers", self.base_url))
             .send()
             .await
-            .map_err(|e| DomainError::Upstream(format!("parallax: {e}")))?;
+            .map_err(|e| {
+                self.circuit_breaker.record_failure();
+                DomainError::Upstream(format!("parallax: {e}"))
+            })?;
 
         if !resp.status().is_success() {
-            return Err(DomainError::Upstream(format!(
-                "parallax returned {}",
-                resp.status()
-            )));
+            let status = resp.status();
+            if status.is_server_error() {
+                self.circuit_breaker.record_failure();
+            }
+            return Err(DomainError::Upstream(format!("parallax returned {status}")));
         }
+
+        self.circuit_breaker.record_success();
 
         resp.json()
             .await

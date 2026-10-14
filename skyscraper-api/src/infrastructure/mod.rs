@@ -1,3 +1,5 @@
+pub mod cache;
+pub mod circuit_breaker;
 pub mod clients;
 pub mod intelligence;
 pub mod queue;

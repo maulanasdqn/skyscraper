@@ -3,6 +3,7 @@ pub mod auth;
 pub mod error;
 pub mod health;
 pub mod jobs;
+pub mod middleware;
 pub mod results;
 pub mod tenants;
 pub mod usage;
@@ -61,8 +62,10 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     Router::new()
         .route("/api/v1/health", get(health::health))
+        .route("/api/v1/health/ready", get(health::readiness))
         .nest("/api/v1/admin", admin_routes)
         .nest("/api/v1", authenticated_routes)
+        .layer(axum::middleware::from_fn(middleware::request_id))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)

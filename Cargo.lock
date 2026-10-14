@@ -1790,6 +1790,7 @@ name = "skyscraper-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "redis",
  "skyscraper-api",
  "sqlx",
  "tokio",

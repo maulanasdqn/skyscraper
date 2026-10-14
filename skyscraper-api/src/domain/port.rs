@@ -132,3 +132,9 @@ pub trait JobQueue: Send + Sync {
     async fn queue_stats(&self) -> Result<QueueStats>;
     async fn retry_dead(&self, limit: usize) -> Result<u64>;
 }
+
+#[async_trait]
+pub trait ResponseCache: Send + Sync {
+    async fn get(&self, url: &str) -> Result<Option<ScrapeJobResult>>;
+    async fn set(&self, url: &str, result: &ScrapeJobResult, ttl_secs: Option<u64>) -> Result<()>;
+}

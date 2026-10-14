@@ -7,7 +7,8 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsageRepository};
-use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection};
+use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection, ResponseCache};
+use skyscraper::infrastructure::cache::RedisResponseCache;
 use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
@@ -38,6 +39,7 @@ async fn main() -> Result<()> {
     let proxy_pass = required_env("PROXY_PASS")?;
     let cosmium_url = env_or("COSMIUM_URL", "http://localhost:3000");
     let concurrency: usize = env_or("WORKER_CONCURRENCY", "4").parse()?;
+    let cache_ttl: u64 = env_or("CACHE_TTL_SECS", "300").parse()?;
 
     let pool = PgPoolOptions::new()
         .max_connections(10)
@@ -45,7 +47,17 @@ async fn main() -> Result<()> {
         .await
         .context("failed to connect to database")?;
 
-    let queue: Arc<dyn JobQueue> = Arc::new(RedisQueue::new(&redis_url).await?);
+    let redis_queue = RedisQueue::new(&redis_url).await?;
+    let queue: Arc<dyn JobQueue> = Arc::new(redis_queue);
+
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).context("failed to open redis for cache")?;
+    let cache_conn = redis::aio::ConnectionManager::new(redis_client)
+        .await
+        .context("failed to connect redis for cache")?;
+    let response_cache: Arc<dyn ResponseCache> =
+        Arc::new(RedisResponseCache::new(cache_conn, cache_ttl));
+
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
     let tenant_repo = Arc::new(PgTenantRepository::new(pool.clone()));
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
@@ -65,7 +77,7 @@ async fn main() -> Result<()> {
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    info!("starting {concurrency} workers");
+    info!("starting {concurrency} workers (cache TTL: {cache_ttl}s)");
 
     let mut handles = Vec::new();
     for i in 0..concurrency {
@@ -77,6 +89,7 @@ async fn main() -> Result<()> {
             proxy_selector.clone(),
             profile_rotator.clone(),
             cosmium_client.clone(),
+            response_cache.clone(),
             webhook.clone(),
             shutdown_rx.clone(),
         );

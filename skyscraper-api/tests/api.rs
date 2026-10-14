@@ -1025,3 +1025,76 @@ async fn admin_list_carriers() {
     assert_eq!(carriers[0]["name"], "test-carrier");
     assert_eq!(carriers[0]["online"], true);
 }
+
+// --- Readiness ---
+
+#[tokio::test]
+async fn readiness_returns_degraded_without_deps() {
+    let app = test_app();
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/health/ready")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Mock repos succeed, mock queue succeeds → should be ready
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp.into_body()).await;
+    assert_eq!(body["status"], "ready");
+    assert!(body["checks"]["postgres"]["latency_ms"].is_number());
+    assert!(body["checks"]["redis"]["latency_ms"].is_number());
+}
+
+// --- Request ID middleware ---
+
+#[tokio::test]
+async fn response_includes_request_id() {
+    let app = test_app();
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let request_id = resp.headers().get("x-request-id");
+    assert!(request_id.is_some(), "response must include x-request-id");
+    let id_str = request_id.unwrap().to_str().unwrap();
+    assert!(
+        uuid::Uuid::parse_str(id_str).is_ok(),
+        "x-request-id should be a valid UUID, got: {id_str}"
+    );
+}
+
+#[tokio::test]
+async fn request_id_echoed_if_provided() {
+    let app = test_app();
+    let custom_id = "my-custom-request-id-12345";
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/health")
+                .header("x-request-id", custom_id)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let returned_id = resp
+        .headers()
+        .get("x-request-id")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert_eq!(returned_id, custom_id);
+}
