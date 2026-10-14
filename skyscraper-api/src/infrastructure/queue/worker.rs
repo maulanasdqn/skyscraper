@@ -6,13 +6,12 @@ use uuid::Uuid;
 use crate::domain::entity::ScrapeJobRequest;
 use crate::domain::error::DomainError;
 use crate::domain::job_status::JobStatus;
-use crate::domain::port::{JobRepository, ScrapeClient, UsageRepository};
+use crate::domain::port::{JobQueue, JobRepository, ScrapeClient, UsageRepository};
 use crate::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use crate::infrastructure::intelligence::proxy_selector::ProxySelector;
-use crate::infrastructure::queue::redis_queue::RedisQueue;
 
 pub struct Worker {
-    queue: Arc<RedisQueue>,
+    queue: Arc<dyn JobQueue>,
     job_repo: Arc<dyn JobRepository>,
     usage_repo: Arc<dyn UsageRepository>,
     proxy_selector: Arc<ProxySelector>,
@@ -23,7 +22,7 @@ pub struct Worker {
 
 impl Worker {
     pub fn new(
-        queue: Arc<RedisQueue>,
+        queue: Arc<dyn JobQueue>,
         job_repo: Arc<dyn JobRepository>,
         usage_repo: Arc<dyn UsageRepository>,
         proxy_selector: Arc<ProxySelector>,

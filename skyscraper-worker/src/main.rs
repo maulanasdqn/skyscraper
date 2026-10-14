@@ -11,6 +11,7 @@ use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use skyscraper::infrastructure::intelligence::proxy_selector::ProxySelector;
+use skyscraper::domain::port::JobQueue;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 use skyscraper::infrastructure::queue::worker::Worker;
 
@@ -43,7 +44,7 @@ async fn main() -> Result<()> {
         .await
         .context("failed to connect to database")?;
 
-    let queue = Arc::new(RedisQueue::new(&redis_url).await?);
+    let queue: Arc<dyn JobQueue> = Arc::new(RedisQueue::new(&redis_url).await?);
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
 

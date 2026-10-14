@@ -8,6 +8,7 @@ use tracing_subscriber::EnvFilter;
 
 use skyscraper::adapter::http::{self, AppState, ParallaxConfig};
 use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsageRepository};
+use skyscraper::domain::port::JobQueue;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 
@@ -45,7 +46,7 @@ async fn main() -> Result<()> {
         .await
         .context("failed to run migrations")?;
 
-    let queue = Arc::new(RedisQueue::new(&redis_url).await?);
+    let queue: Arc<dyn JobQueue> = Arc::new(RedisQueue::new(&redis_url).await?);
 
     let tenant_repo = Arc::new(PgTenantRepository::new(pool.clone()));
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));

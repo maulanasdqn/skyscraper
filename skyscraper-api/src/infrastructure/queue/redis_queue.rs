@@ -1,8 +1,11 @@
+use async_trait::async_trait;
 use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
 use uuid::Uuid;
 
+use crate::domain::entity::QueueStats;
 use crate::domain::error::DomainError;
+use crate::domain::port::JobQueue;
 
 pub struct RedisQueue {
     conn: ConnectionManager,
@@ -33,8 +36,11 @@ impl RedisQueue {
             _ => DEFAULT_QUEUE,
         }
     }
+}
 
-    pub async fn enqueue(&self, job_id: Uuid, priority: i16) -> Result<(), DomainError> {
+#[async_trait]
+impl JobQueue for RedisQueue {
+    async fn enqueue(&self, job_id: Uuid, priority: i16) -> Result<(), DomainError> {
         let mut conn = self.conn.clone();
         let key = Self::queue_key(priority);
         conn.rpush::<_, _, ()>(key, job_id.to_string())
@@ -43,7 +49,7 @@ impl RedisQueue {
         Ok(())
     }
 
-    pub async fn schedule(
+    async fn schedule(
         &self,
         job_id: Uuid,
         run_at_epoch: f64,
@@ -55,7 +61,7 @@ impl RedisQueue {
         Ok(())
     }
 
-    pub async fn dequeue(&self, timeout_secs: f64) -> Result<Option<Uuid>, DomainError> {
+    async fn dequeue(&self, timeout_secs: f64) -> Result<Option<Uuid>, DomainError> {
         let mut conn = self.conn.clone();
         let result: Option<(String, String)> = conn
             .blpop(&[HIGH_QUEUE, DEFAULT_QUEUE, LOW_QUEUE], timeout_secs)
@@ -82,7 +88,7 @@ impl RedisQueue {
         Ok(Some(job_id))
     }
 
-    pub async fn ack(&self, job_id: Uuid) -> Result<(), DomainError> {
+    async fn ack(&self, job_id: Uuid) -> Result<(), DomainError> {
         let mut conn = self.conn.clone();
         conn.zrem::<_, _, ()>(PROCESSING_SET, job_id.to_string())
             .await
@@ -90,7 +96,7 @@ impl RedisQueue {
         Ok(())
     }
 
-    pub async fn move_to_dead(&self, job_id: Uuid) -> Result<(), DomainError> {
+    async fn move_to_dead(&self, job_id: Uuid) -> Result<(), DomainError> {
         let mut conn = self.conn.clone();
         conn.zrem::<_, _, ()>(PROCESSING_SET, job_id.to_string())
             .await
@@ -104,7 +110,7 @@ impl RedisQueue {
         Ok(())
     }
 
-    pub async fn promote_scheduled(&self) -> Result<u64, DomainError> {
+    async fn promote_scheduled(&self) -> Result<u64, DomainError> {
         let mut conn = self.conn.clone();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -130,7 +136,7 @@ impl RedisQueue {
         Ok(promoted)
     }
 
-    pub async fn reclaim_stale(&self, max_age_secs: u64) -> Result<u64, DomainError> {
+    async fn reclaim_stale(&self, max_age_secs: u64) -> Result<u64, DomainError> {
         let mut conn = self.conn.clone();
         let cutoff = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -157,27 +163,7 @@ impl RedisQueue {
         Ok(reclaimed)
     }
 
-    pub async fn queue_stats(&self) -> Result<QueueStats, DomainError> {
-        let mut conn = self.conn.clone();
-        let high: u64 = conn.llen(HIGH_QUEUE).await.unwrap_or(0);
-        let default: u64 = conn.llen(DEFAULT_QUEUE).await.unwrap_or(0);
-        let low: u64 = conn.llen(LOW_QUEUE).await.unwrap_or(0);
-        let processing: u64 = conn.zcard(PROCESSING_SET).await.unwrap_or(0);
-        let scheduled: u64 = conn.zcard(SCHEDULED_SET).await.unwrap_or(0);
-        let dead: u64 = conn.llen(DEAD_QUEUE).await.unwrap_or(0);
-
-        Ok(QueueStats {
-            pending: high + default + low,
-            pending_high: high,
-            pending_default: default,
-            pending_low: low,
-            processing,
-            scheduled,
-            dead,
-        })
-    }
-
-    pub async fn check_rate_limit(
+    async fn check_rate_limit(
         &self,
         tenant_id: &Uuid,
         limit_rpm: i32,
@@ -198,15 +184,24 @@ impl RedisQueue {
 
         Ok(count <= i64::from(limit_rpm))
     }
-}
 
-#[derive(Debug, serde::Serialize)]
-pub struct QueueStats {
-    pub pending: u64,
-    pub pending_high: u64,
-    pub pending_default: u64,
-    pub pending_low: u64,
-    pub processing: u64,
-    pub scheduled: u64,
-    pub dead: u64,
+    async fn queue_stats(&self) -> Result<QueueStats, DomainError> {
+        let mut conn = self.conn.clone();
+        let high: u64 = conn.llen(HIGH_QUEUE).await.unwrap_or(0);
+        let default: u64 = conn.llen(DEFAULT_QUEUE).await.unwrap_or(0);
+        let low: u64 = conn.llen(LOW_QUEUE).await.unwrap_or(0);
+        let processing: u64 = conn.zcard(PROCESSING_SET).await.unwrap_or(0);
+        let scheduled: u64 = conn.zcard(SCHEDULED_SET).await.unwrap_or(0);
+        let dead: u64 = conn.llen(DEAD_QUEUE).await.unwrap_or(0);
+
+        Ok(QueueStats {
+            pending: high + default + low,
+            pending_high: high,
+            pending_default: default,
+            pending_low: low,
+            processing,
+            scheduled,
+            dead,
+        })
+    }
 }

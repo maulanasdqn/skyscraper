@@ -13,8 +13,9 @@ use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
-use crate::domain::port::{CarrierClient, JobRepository, TenantRepository, UsageRepository};
-use crate::infrastructure::queue::redis_queue::RedisQueue;
+use crate::domain::port::{
+    CarrierClient, JobQueue, JobRepository, TenantRepository, UsageRepository,
+};
 
 pub struct ParallaxConfig {
     pub proxy_host: String,
@@ -26,7 +27,7 @@ pub struct AppState {
     pub tenant_repo: Arc<dyn TenantRepository>,
     pub job_repo: Arc<dyn JobRepository>,
     pub usage_repo: Arc<dyn UsageRepository>,
-    pub queue: Arc<RedisQueue>,
+    pub queue: Arc<dyn JobQueue>,
     pub carrier_client: Arc<dyn CarrierClient>,
     pub parallax_config: ParallaxConfig,
     pub admin_key: String,

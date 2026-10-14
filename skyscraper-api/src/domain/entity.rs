@@ -133,3 +133,14 @@ pub struct CarrierInfo {
     pub upstream_addr: String,
     pub online: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueueStats {
+    pub pending: u64,
+    pub pending_high: u64,
+    pub pending_default: u64,
+    pub pending_low: u64,
+    pub processing: u64,
+    pub scheduled: u64,
+    pub dead: u64,
+}

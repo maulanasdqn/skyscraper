@@ -3,7 +3,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::entity::{
-    CarrierInfo, Job, ScrapeJobRequest, ScrapeJobResult, Tenant, TenantPlan, UsageRecord,
+    CarrierInfo, Job, QueueStats, ScrapeJobRequest, ScrapeJobResult, Tenant, TenantPlan,
+    UsageRecord,
 };
 use super::error::DomainError;
 use super::job_status::JobStatus;
@@ -80,4 +81,17 @@ pub trait ScrapeClient: Send + Sync {
         proxy_url: Option<&str>,
     ) -> Result<ScrapeJobResult>;
     async fn list_profiles(&self) -> Result<Vec<String>>;
+}
+
+#[async_trait]
+pub trait JobQueue: Send + Sync {
+    async fn enqueue(&self, job_id: Uuid, priority: i16) -> Result<()>;
+    async fn schedule(&self, job_id: Uuid, run_at_epoch: f64) -> Result<()>;
+    async fn dequeue(&self, timeout_secs: f64) -> Result<Option<Uuid>>;
+    async fn ack(&self, job_id: Uuid) -> Result<()>;
+    async fn move_to_dead(&self, job_id: Uuid) -> Result<()>;
+    async fn promote_scheduled(&self) -> Result<u64>;
+    async fn reclaim_stale(&self, max_age_secs: u64) -> Result<u64>;
+    async fn check_rate_limit(&self, tenant_id: &Uuid, limit_rpm: i32) -> Result<bool>;
+    async fn queue_stats(&self) -> Result<QueueStats>;
 }

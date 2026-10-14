@@ -6,8 +6,7 @@ use axum::Json;
 use super::auth::AdminAuth;
 use super::error::ApiResult;
 use super::AppState;
-use crate::domain::entity::CarrierInfo;
-use crate::infrastructure::queue::redis_queue::QueueStats;
+use crate::domain::entity::{CarrierInfo, QueueStats};
 
 pub async fn queue_stats(
     _admin: AdminAuth,
