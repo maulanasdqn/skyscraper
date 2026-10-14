@@ -192,6 +192,29 @@ impl JobQueue for RedisQueue {
         Ok(count <= i64::from(limit_rpm))
     }
 
+    async fn retry_dead(&self, limit: usize) -> Result<u64, DomainError> {
+        let mut conn = self.conn.clone();
+        let mut retried = 0u64;
+
+        for _ in 0..limit {
+            let id_str: Option<String> = conn
+                .rpop(DEAD_QUEUE, None)
+                .await
+                .map_err(|e| DomainError::Upstream(format!("redis dead pop: {e}")))?;
+
+            let Some(id_str) = id_str else {
+                break;
+            };
+
+            conn.rpush::<_, _, ()>(DEFAULT_QUEUE, &id_str)
+                .await
+                .map_err(|e| DomainError::Upstream(format!("redis retry push: {e}")))?;
+            retried += 1;
+        }
+
+        Ok(retried)
+    }
+
     async fn queue_stats(&self) -> Result<QueueStats, DomainError> {
         let mut conn = self.conn.clone();
         let high: u64 = conn.llen(HIGH_QUEUE).await.unwrap_or(0);

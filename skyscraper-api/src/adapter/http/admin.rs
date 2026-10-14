@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::Json;
+use serde::Deserialize;
 
 use super::auth::AdminAuth;
 use super::error::ApiResult;
@@ -16,13 +17,23 @@ pub async fn queue_stats(
     Ok(Json(result))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RetryDeadQuery {
+    #[serde(default = "default_retry_limit")]
+    pub limit: usize,
+}
+
+fn default_retry_limit() -> usize {
+    100
+}
+
 pub async fn retry_dead(
     _admin: AdminAuth,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<RetryDeadQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(
-        serde_json::json!({ "message": "not yet implemented" }),
-    ))
+    let retried = state.queue.retry_dead(q.limit).await?;
+    Ok(Json(serde_json::json!({ "retried": retried })))
 }
 
 pub async fn list_carriers(

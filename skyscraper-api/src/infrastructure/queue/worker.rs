@@ -7,36 +7,45 @@ use crate::domain::entity::Job;
 use crate::domain::error::DomainError;
 use crate::domain::job_status::JobStatus;
 use crate::domain::port::{
-    JobQueue, JobRepository, ProfileSelection, ProxySelection, ScrapeClient, UsageRepository,
+    JobQueue, JobRepository, ProfileSelection, ProxySelection, ScrapeClient, TenantRepository,
+    UsageRepository,
 };
+use crate::infrastructure::webhook::WebhookDelivery;
 
 pub struct Worker {
     queue: Arc<dyn JobQueue>,
     job_repo: Arc<dyn JobRepository>,
+    tenant_repo: Arc<dyn TenantRepository>,
     usage_repo: Arc<dyn UsageRepository>,
     proxy_selector: Arc<dyn ProxySelection>,
     profile_rotator: Arc<dyn ProfileSelection>,
     scrape_client: Arc<dyn ScrapeClient>,
+    webhook: Arc<WebhookDelivery>,
     shutdown_rx: watch::Receiver<bool>,
 }
 
 impl Worker {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         queue: Arc<dyn JobQueue>,
         job_repo: Arc<dyn JobRepository>,
+        tenant_repo: Arc<dyn TenantRepository>,
         usage_repo: Arc<dyn UsageRepository>,
         proxy_selector: Arc<dyn ProxySelection>,
         profile_rotator: Arc<dyn ProfileSelection>,
         scrape_client: Arc<dyn ScrapeClient>,
+        webhook: Arc<WebhookDelivery>,
         shutdown_rx: watch::Receiver<bool>,
     ) -> Self {
         Self {
             queue,
             job_repo,
+            tenant_repo,
             usage_repo,
             proxy_selector,
             profile_rotator,
             scrape_client,
+            webhook,
             shutdown_rx,
         }
     }
@@ -113,8 +122,34 @@ impl Worker {
             self.job_repo.set_status(job_id, JobStatus::Failed).await?;
             self.queue.move_to_dead(job_id).await?;
             error!("job {job_id} failed permanently: {error_msg}");
+
+            self.deliver_webhook(job.tenant_id, job_id, None, Some(error_msg))
+                .await;
         }
         Ok(())
+    }
+
+    async fn deliver_webhook(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        result: Option<&crate::domain::entity::ScrapeJobResult>,
+        error: Option<&str>,
+    ) {
+        let Ok(Some(tenant)) = self.tenant_repo.find_by_id(tenant_id).await else {
+            return;
+        };
+
+        if let Some(ref webhook_url) = tenant.webhook_url {
+            let wh = self.webhook.clone();
+            let url = webhook_url.clone();
+            let result_owned = result.cloned();
+            let error_owned = error.map(String::from);
+            tokio::spawn(async move {
+                wh.deliver(&url, job_id, result_owned.as_ref(), error_owned.as_deref())
+                    .await;
+            });
+        }
     }
 
     async fn process_job(&self, job_id: Uuid) -> Result<(), DomainError> {
@@ -149,6 +184,9 @@ impl Worker {
                 self.queue.ack(job_id).await?;
                 self.usage_repo.record(job.tenant_id, job_id, bytes).await?;
                 info!("job {job_id} completed in {}ms", result.elapsed_ms);
+
+                self.deliver_webhook(job.tenant_id, job_id, Some(&result), None)
+                    .await;
             }
             Err(DomainError::ScrapeBlocked) => {
                 if let Some(ref proxy) = proxy_url {

@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: skyscraper
+      POSTGRES_USER: skyscraper
+      POSTGRES_PASSWORD: skyscraper
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyscraper"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    command: skyscraper-api
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgres://skyscraper:skyscraper@postgres:5432/skyscraper
+      REDIS_URL: redis://redis:6379
+      API_LISTEN: 0.0.0.0:3002
+      API_ADMIN_KEY: sk_admin_dev
+      PROXY_PASS: dev_secret
+      PARALLAX_URL: http://host.docker.internal:3001
+      PARALLAX_PROXY_HOST: host.docker.internal
+      PARALLAX_PROXY_PORT: "1080"
+      COSMIUM_URL: http://host.docker.internal:3000
+      RUST_LOG: skyscraper=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: skyscraper-worker
+    environment:
+      DATABASE_URL: postgres://skyscraper:skyscraper@postgres:5432/skyscraper
+      REDIS_URL: redis://redis:6379
+      PROXY_PASS: dev_secret
+      PARALLAX_URL: http://host.docker.internal:3001
+      PARALLAX_PROXY_HOST: host.docker.internal
+      PARALLAX_PROXY_PORT: "1080"
+      COSMIUM_URL: http://host.docker.internal:3000
+      WORKER_CONCURRENCY: "4"
+      RUST_LOG: skyscraper=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

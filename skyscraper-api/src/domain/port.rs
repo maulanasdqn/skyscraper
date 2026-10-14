@@ -130,4 +130,5 @@ pub trait JobQueue: Send + Sync {
     async fn reclaim_stale(&self, max_age_secs: u64) -> Result<u64>;
     async fn check_rate_limit(&self, tenant_id: &Uuid, limit_rpm: i32) -> Result<bool>;
     async fn queue_stats(&self) -> Result<QueueStats>;
+    async fn retry_dead(&self, limit: usize) -> Result<u64>;
 }

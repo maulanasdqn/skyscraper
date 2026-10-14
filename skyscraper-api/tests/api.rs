@@ -353,6 +353,10 @@ impl JobQueue for MockJobQueue {
             dead: 0,
         })
     }
+
+    async fn retry_dead(&self, _limit: usize) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 struct MockScrapeService {

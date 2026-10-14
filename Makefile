@@ -1,4 +1,4 @@
-.PHONY: all check fmt lint test build clean run-api run-worker db-migrate db-create
+.PHONY: all check fmt lint test build clean run-api run-worker db-migrate db-create docker-build docker-up docker-down docker-logs
 
 all: fmt lint test build
 
@@ -48,3 +48,17 @@ db-migrate:
 
 ci: fmt-check lint test
 	@echo "All checks passed."
+
+# ──── Docker ────
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f

@@ -6,7 +6,7 @@ use tokio::sync::watch;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use skyscraper::adapter::postgres::{PgJobRepository, PgUsageRepository};
+use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsageRepository};
 use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection};
 use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
@@ -14,6 +14,7 @@ use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use skyscraper::infrastructure::intelligence::proxy_selector::ProxySelector;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 use skyscraper::infrastructure::queue::worker::Worker;
+use skyscraper::infrastructure::webhook::WebhookDelivery;
 
 fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
@@ -46,7 +47,9 @@ async fn main() -> Result<()> {
 
     let queue: Arc<dyn JobQueue> = Arc::new(RedisQueue::new(&redis_url).await?);
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
+    let tenant_repo = Arc::new(PgTenantRepository::new(pool.clone()));
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
+    let webhook = Arc::new(WebhookDelivery::new());
 
     let parallax_client: Arc<ParallaxClient> = Arc::new(ParallaxClient::new(&parallax_url));
     let cosmium_client: Arc<CosmiumClient> = Arc::new(CosmiumClient::new(&cosmium_url));
@@ -69,10 +72,12 @@ async fn main() -> Result<()> {
         let worker = Worker::new(
             queue.clone(),
             job_repo.clone(),
+            tenant_repo.clone(),
             usage_repo.clone(),
             proxy_selector.clone(),
             profile_rotator.clone(),
             cosmium_client.clone(),
+            webhook.clone(),
             shutdown_rx.clone(),
         );
         handles.push(tokio::spawn(async move {

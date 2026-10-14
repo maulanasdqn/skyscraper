@@ -3,6 +3,7 @@ pub mod auth;
 pub mod error;
 pub mod health;
 pub mod jobs;
+pub mod results;
 pub mod tenants;
 pub mod usage;
 
@@ -54,6 +55,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/jobs", get(jobs::list_jobs).post(jobs::create_job))
         .route("/jobs/batch", post(jobs::create_batch))
         .route("/jobs/{id}", get(jobs::get_job).delete(jobs::cancel_job))
+        .route("/results/{job_id}", get(results::get_result))
+        .route("/results/{job_id}/screenshot", get(results::get_screenshot))
         .route("/usage", get(usage::get_usage));
 
     Router::new()
