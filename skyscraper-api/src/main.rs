@@ -11,6 +11,7 @@ use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsage
 use skyscraper::application::scrape_service::ScrapeServiceImpl;
 use skyscraper::domain::port::JobQueue;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
+use skyscraper::infrastructure::metrics::MetricsCollector;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 
 fn env_or(key: &str, default: &str) -> String {
@@ -21,11 +22,24 @@ fn required_env(key: &str) -> Result<String> {
     std::env::var(key).with_context(|| format!("{key} must be set"))
 }
 
+fn init_logging() -> Result<()> {
+    let filter = EnvFilter::from_default_env().add_directive("skyscraper=info".parse()?);
+    let json_logs = env_or("LOG_FORMAT", "text") == "json";
+
+    if json_logs {
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(filter)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("skyscraper=info".parse()?))
-        .init();
+    init_logging()?;
 
     let database_url = required_env("DATABASE_URL")?;
     let admin_key = required_env("API_ADMIN_KEY")?;
@@ -54,6 +68,7 @@ async fn main() -> Result<()> {
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
     let carrier_client = Arc::new(ParallaxClient::new(&parallax_url));
     let scrape_service = Arc::new(ScrapeServiceImpl::new(job_repo.clone(), queue.clone()));
+    let metrics = Arc::new(MetricsCollector::new());
 
     let state = Arc::new(AppState {
         tenant_repo,
@@ -68,6 +83,7 @@ async fn main() -> Result<()> {
             proxy_pass,
         },
         admin_key,
+        metrics,
     });
 
     let app = http::router(state);

@@ -14,11 +14,13 @@ use axum::routing::{get, patch, post};
 use axum::Router;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::domain::port::{
     CarrierClient, JobQueue, JobRepository, ScrapeService, TenantRepository, UsageRepository,
 };
+use crate::infrastructure::metrics::MetricsCollector;
 
 pub struct ParallaxConfig {
     pub proxy_host: String,
@@ -35,6 +37,7 @@ pub struct AppState {
     pub scrape_service: Arc<dyn ScrapeService>,
     pub parallax_config: ParallaxConfig,
     pub admin_key: String,
+    pub metrics: Arc<MetricsCollector>,
 }
 
 pub fn router(state: Arc<AppState>) -> Router {
@@ -50,7 +53,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route("/queue/stats", get(admin::queue_stats))
         .route("/queue/retry-dead", post(admin::retry_dead))
-        .route("/carriers", get(admin::list_carriers));
+        .route("/carriers", get(admin::list_carriers))
+        .route("/metrics", get(admin::metrics));
 
     let authenticated_routes = Router::new()
         .route("/scrape", post(jobs::scrape_sync))
@@ -66,6 +70,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/health/ready", get(health::readiness))
         .nest("/api/v1/admin", admin_routes)
         .nest("/api/v1", authenticated_routes)
+        .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(axum::middleware::from_fn(middleware::request_id))
         .layer(TraceLayer::new_for_http())

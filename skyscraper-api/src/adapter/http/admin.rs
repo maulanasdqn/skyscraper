@@ -43,3 +43,10 @@ pub async fn list_carriers(
     let carriers = state.carrier_client.list_carriers().await?;
     Ok(Json(carriers))
 }
+
+pub async fn metrics(
+    _admin: AdminAuth,
+    State(state): State<Arc<AppState>>,
+) -> Json<crate::infrastructure::metrics::Metrics> {
+    Json(state.metrics.snapshot())
+}

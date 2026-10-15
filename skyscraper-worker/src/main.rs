@@ -11,8 +11,11 @@ use skyscraper::domain::port::{JobQueue, ProfileSelection, ProxySelection, Respo
 use skyscraper::infrastructure::cache::RedisResponseCache;
 use skyscraper::infrastructure::clients::cosmium::CosmiumClient;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
+use skyscraper::infrastructure::dedup::InflightDedup;
+use skyscraper::infrastructure::domain_throttle::DomainThrottle;
 use skyscraper::infrastructure::intelligence::profile_rotator::ProfileRotator;
 use skyscraper::infrastructure::intelligence::proxy_selector::ProxySelector;
+use skyscraper::infrastructure::metrics::MetricsCollector;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
 use skyscraper::infrastructure::queue::worker::Worker;
 use skyscraper::infrastructure::webhook::WebhookDelivery;
@@ -25,11 +28,24 @@ fn required_env(key: &str) -> Result<String> {
     std::env::var(key).with_context(|| format!("{key} must be set"))
 }
 
+fn init_logging() -> Result<()> {
+    let filter = EnvFilter::from_default_env().add_directive("skyscraper=info".parse()?);
+    let json_logs = env_or("LOG_FORMAT", "text") == "json";
+
+    if json_logs {
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(filter)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("skyscraper=info".parse()?))
-        .init();
+    init_logging()?;
 
     let database_url = required_env("DATABASE_URL")?;
     let redis_url = env_or("REDIS_URL", "redis://localhost:6379");
@@ -40,6 +56,7 @@ async fn main() -> Result<()> {
     let cosmium_url = env_or("COSMIUM_URL", "http://localhost:3000");
     let concurrency: usize = env_or("WORKER_CONCURRENCY", "4").parse()?;
     let cache_ttl: u64 = env_or("CACHE_TTL_SECS", "300").parse()?;
+    let domain_max_rpm: u32 = env_or("DOMAIN_MAX_RPM", "30").parse()?;
 
     let pool = PgPoolOptions::new()
         .max_connections(10)
@@ -56,7 +73,11 @@ async fn main() -> Result<()> {
         .await
         .context("failed to connect redis for cache")?;
     let response_cache: Arc<dyn ResponseCache> =
-        Arc::new(RedisResponseCache::new(cache_conn, cache_ttl));
+        Arc::new(RedisResponseCache::new(cache_conn.clone(), cache_ttl));
+
+    let dedup = Arc::new(InflightDedup::new(cache_conn.clone()));
+    let domain_throttle = Arc::new(DomainThrottle::new(cache_conn, domain_max_rpm));
+    let metrics = Arc::new(MetricsCollector::new());
 
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
     let tenant_repo = Arc::new(PgTenantRepository::new(pool.clone()));
@@ -77,7 +98,9 @@ async fn main() -> Result<()> {
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    info!("starting {concurrency} workers (cache TTL: {cache_ttl}s)");
+    info!(
+        "starting {concurrency} workers (cache TTL: {cache_ttl}s, domain limit: {domain_max_rpm} rpm)"
+    );
 
     let mut handles = Vec::new();
     for i in 0..concurrency {
@@ -90,6 +113,9 @@ async fn main() -> Result<()> {
             profile_rotator.clone(),
             cosmium_client.clone(),
             response_cache.clone(),
+            dedup.clone(),
+            domain_throttle.clone(),
+            metrics.clone(),
             webhook.clone(),
             shutdown_rx.clone(),
         );
@@ -106,6 +132,12 @@ async fn main() -> Result<()> {
     for handle in handles {
         let _ = handle.await;
     }
+
+    let snap = metrics.snapshot();
+    info!(
+        "final metrics — processed: {}, failed: {}, cache hits: {}, dedup coalesced: {}",
+        snap.jobs_processed, snap.jobs_failed, snap.cache_hits, snap.dedup_coalesced
+    );
 
     info!("all workers stopped");
     Ok(())

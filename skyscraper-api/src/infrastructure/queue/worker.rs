@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -11,6 +12,9 @@ use crate::domain::port::{
     JobQueue, JobRepository, ProfileSelection, ProxySelection, ResponseCache, ScrapeClient,
     TenantRepository, UsageRepository,
 };
+use crate::infrastructure::dedup::InflightDedup;
+use crate::infrastructure::domain_throttle::DomainThrottle;
+use crate::infrastructure::metrics::MetricsCollector;
 use crate::infrastructure::webhook::WebhookDelivery;
 
 const JOB_TIMEOUT: Duration = Duration::from_mins(2);
@@ -24,6 +28,9 @@ pub struct Worker {
     profile_rotator: Arc<dyn ProfileSelection>,
     scrape_client: Arc<dyn ScrapeClient>,
     response_cache: Arc<dyn ResponseCache>,
+    dedup: Arc<InflightDedup>,
+    domain_throttle: Arc<DomainThrottle>,
+    metrics: Arc<MetricsCollector>,
     webhook: Arc<WebhookDelivery>,
     shutdown_rx: watch::Receiver<bool>,
 }
@@ -39,6 +46,9 @@ impl Worker {
         profile_rotator: Arc<dyn ProfileSelection>,
         scrape_client: Arc<dyn ScrapeClient>,
         response_cache: Arc<dyn ResponseCache>,
+        dedup: Arc<InflightDedup>,
+        domain_throttle: Arc<DomainThrottle>,
+        metrics: Arc<MetricsCollector>,
         webhook: Arc<WebhookDelivery>,
         shutdown_rx: watch::Receiver<bool>,
     ) -> Self {
@@ -51,6 +61,9 @@ impl Worker {
             profile_rotator,
             scrape_client,
             response_cache,
+            dedup,
+            domain_throttle,
+            metrics,
             webhook,
             shutdown_rx,
         }
@@ -144,6 +157,7 @@ impl Worker {
                 .await?;
             self.job_repo.set_status(job_id, JobStatus::Failed).await?;
             self.queue.move_to_dead(job_id).await?;
+            self.metrics.jobs_failed.fetch_add(1, Ordering::Relaxed);
             error!("job {job_id} failed permanently: {error_msg}");
 
             self.deliver_webhook(job.tenant_id, job_id, None, Some(error_msg))
@@ -168,11 +182,33 @@ impl Worker {
             let url = webhook_url.clone();
             let result_owned = result.cloned();
             let error_owned = error.map(String::from);
+            let metrics = self.metrics.clone();
             tokio::spawn(async move {
                 wh.deliver(&url, job_id, result_owned.as_ref(), error_owned.as_deref())
                     .await;
+                metrics.webhook_deliveries.fetch_add(1, Ordering::Relaxed);
             });
         }
+    }
+
+    async fn complete_from_cache(
+        &self,
+        job_id: Uuid,
+        job: &Job,
+        cached: &crate::domain::entity::ScrapeJobResult,
+    ) -> Result<(), DomainError> {
+        let bytes = cached.html_length as i64;
+        self.job_repo
+            .set_running(job_id, None, &cached.profile_used)
+            .await?;
+        self.job_repo.set_completed(job_id, cached).await?;
+        self.queue.ack(job_id).await?;
+        self.usage_repo.record(job.tenant_id, job_id, bytes).await?;
+        self.metrics.cache_hits.fetch_add(1, Ordering::Relaxed);
+        self.metrics.record_job_completed(0);
+        self.deliver_webhook(job.tenant_id, job_id, Some(cached), None)
+            .await;
+        Ok(())
     }
 
     async fn process_job(&self, job_id: Uuid) -> Result<(), DomainError> {
@@ -191,39 +227,80 @@ impl Worker {
             serde_json::from_value(job.request.clone())
                 .map_err(|e| DomainError::InvalidInput(format!("malformed job request: {e}")))?;
 
+        // 1. Check response cache
         if let Ok(Some(cached)) = self.response_cache.get(&request.url).await {
             info!(
                 "job {job_id} served from cache ({}ms saved)",
                 cached.elapsed_ms
             );
-            let bytes = cached.html_length as i64;
-            self.job_repo
-                .set_running(job_id, None, &cached.profile_used)
-                .await?;
-            self.job_repo.set_completed(job_id, &cached).await?;
+            return self.complete_from_cache(job_id, &job, &cached).await;
+        }
+
+        // 2. Domain throttle — reschedule if domain is being hit too fast
+        if let Ok(false) = self.domain_throttle.check_allowed(&request.url).await {
             self.queue.ack(job_id).await?;
-            self.usage_repo.record(job.tenant_id, job_id, bytes).await?;
-            self.deliver_webhook(job.tenant_id, job_id, Some(&cached), None)
-                .await;
+            let delay = self.domain_throttle.delay_for_domain(&request.url);
+            let run_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs_f64()
+                + delay;
+            self.queue.schedule(job_id, run_at).await?;
+            self.metrics
+                .domain_throttled
+                .fetch_add(1, Ordering::Relaxed);
+            info!("job {job_id} domain-throttled, rescheduled in {delay}s");
             return Ok(());
         }
 
-        let proxy_url = self.proxy_selector.select_proxy(&request).await?;
-        let profile = self.profile_rotator.select_profile(&request).await?;
+        // 3. In-flight dedup — another worker may be scraping this URL right now
+        let acquired = self.dedup.try_acquire(&request.url).await.unwrap_or(true);
+        if !acquired {
+            info!(
+                "job {job_id} waiting for in-flight scrape of {}",
+                request.url
+            );
+            self.metrics.dedup_coalesced.fetch_add(1, Ordering::Relaxed);
+
+            if let Ok(Some(result)) = self
+                .dedup
+                .wait_for_result(&request.url, self.response_cache.as_ref())
+                .await
+            {
+                info!("job {job_id} coalesced from in-flight result");
+                return self.complete_from_cache(job_id, &job, &result).await;
+            }
+            // Timed out waiting — fall through to scrape ourselves
+        }
+
+        self.metrics.cache_misses.fetch_add(1, Ordering::Relaxed);
+        self.execute_scrape(job_id, &job, &request).await
+    }
+
+    async fn execute_scrape(
+        &self,
+        job_id: Uuid,
+        job: &Job,
+        request: &crate::domain::entity::ScrapeJobRequest,
+    ) -> Result<(), DomainError> {
+        let proxy_url = self.proxy_selector.select_proxy(request).await?;
+        let profile = self.profile_rotator.select_profile(request).await?;
 
         self.job_repo.set_running(job_id, None, &profile).await?;
 
         let scrape_result = tokio::time::timeout(
             JOB_TIMEOUT,
             self.scrape_client
-                .scrape(&request.url, &profile, &request, proxy_url.as_deref()),
+                .scrape(&request.url, &profile, request, proxy_url.as_deref()),
         )
         .await;
 
         let scrape_result = if let Ok(inner) = scrape_result {
             inner
         } else {
+            self.metrics.jobs_timed_out.fetch_add(1, Ordering::Relaxed);
             warn!("job {job_id} timed out after {}s", JOB_TIMEOUT.as_secs());
+            let _ = self.dedup.release(&request.url).await;
             Err(DomainError::Upstream(format!(
                 "job timed out after {}s",
                 JOB_TIMEOUT.as_secs()
@@ -236,25 +313,29 @@ impl Worker {
                 self.job_repo.set_completed(job_id, &result).await?;
                 self.queue.ack(job_id).await?;
                 self.usage_repo.record(job.tenant_id, job_id, bytes).await?;
+                self.metrics.record_job_completed(result.elapsed_ms);
                 info!("job {job_id} completed in {}ms", result.elapsed_ms);
 
                 if let Err(e) = self.response_cache.set(&request.url, &result, None).await {
                     warn!("failed to cache result for {}: {e}", request.url);
                 }
+                let _ = self.dedup.release(&request.url).await;
 
                 self.deliver_webhook(job.tenant_id, job_id, Some(&result), None)
                     .await;
             }
             Err(DomainError::ScrapeBlocked) => {
+                let _ = self.dedup.release(&request.url).await;
                 if let Some(ref proxy) = proxy_url {
                     self.proxy_selector.report_proxy_failure(proxy).await;
                 }
                 self.profile_rotator.report_profile_failure(&profile).await;
-                self.handle_failure(job_id, &job, "blocked by target site")
+                self.handle_failure(job_id, job, "blocked by target site")
                     .await?;
             }
             Err(e) => {
-                self.handle_failure(job_id, &job, &e.to_string()).await?;
+                let _ = self.dedup.release(&request.url).await;
+                self.handle_failure(job_id, job, &e.to_string()).await?;
             }
         }
 
