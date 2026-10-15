@@ -70,27 +70,28 @@ impl Worker {
 
     pub async fn run(&self) {
         info!("worker started");
-        let queue = self.queue.clone();
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        let mut last_maintenance = tokio::time::Instant::now();
+        let maintenance_interval = std::time::Duration::from_secs(5);
         loop {
             if *self.shutdown_rx.borrow() {
                 info!("worker shutting down");
                 break;
             }
-            tokio::select! {
-                _ = interval.tick() => self.run_maintenance().await,
-                result = queue.dequeue(5.0) => match result {
-                    Ok(Some(job_id)) => {
-                        if let Err(e) = self.process_job(job_id).await {
-                            error!("job {job_id} processing error: {e}");
-                        }
+            if last_maintenance.elapsed() >= maintenance_interval {
+                self.run_maintenance().await;
+                last_maintenance = tokio::time::Instant::now();
+            }
+            match self.queue.dequeue(5.0).await {
+                Ok(Some(job_id)) => {
+                    if let Err(e) = self.process_job(job_id).await {
+                        error!("job {job_id} processing error: {e}");
                     }
-                    Ok(None) => {}
-                    Err(e) => {
-                        error!("dequeue error: {e}");
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    }
-                },
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!("dequeue error: {e}");
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                }
             }
         }
     }
