@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use super::auth::AuthenticatedTenant;
 use super::error::{ApiError, ApiResult};
+use super::pagination::PaginatedResponse;
 use super::AppState;
 use crate::domain::entity::{Job, ScrapeJobRequest};
 use crate::domain::error::DomainError;
@@ -69,11 +70,25 @@ pub struct BatchResponse {
     pub job_ids: Vec<Uuid>,
 }
 
+fn rate_limit_headers(limit: i32, remaining: i64, reset_epoch: i64) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    if let Ok(v) = HeaderValue::from_str(&limit.to_string()) {
+        headers.insert("x-ratelimit-limit", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&remaining.max(0).to_string()) {
+        headers.insert("x-ratelimit-remaining", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&reset_epoch.to_string()) {
+        headers.insert("x-ratelimit-reset", v);
+    }
+    headers
+}
+
 pub async fn create_job(
     tenant: AuthenticatedTenant,
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateJobRequest>,
-) -> ApiResult<(StatusCode, Json<Job>)> {
+) -> Result<impl IntoResponse, ApiError> {
     let job = state
         .scrape_service
         .submit_job(
@@ -85,7 +100,18 @@ pub async fn create_job(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(job)))
+    let rl = state
+        .queue
+        .rate_limit_info(&tenant.0.id, tenant.0.rate_limit_rpm)
+        .await
+        .unwrap_or(crate::domain::entity::RateLimitInfo {
+            limit: tenant.0.rate_limit_rpm,
+            remaining: 0,
+            reset_epoch: 0,
+        });
+
+    let headers = rate_limit_headers(rl.limit, rl.remaining, rl.reset_epoch);
+    Ok((StatusCode::CREATED, headers, Json(job)))
 }
 
 pub async fn scrape_sync(
@@ -198,13 +224,19 @@ pub async fn list_jobs(
     tenant: AuthenticatedTenant,
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListJobsQuery>,
-) -> ApiResult<Json<Vec<Job>>> {
+) -> ApiResult<Json<PaginatedResponse<Job>>> {
     let offset = (q.page - 1) * q.per_page;
     let jobs = state
         .scrape_service
         .list_jobs(tenant.0.id, q.status, q.per_page, offset)
         .await?;
-    Ok(Json(jobs))
+    let total = state
+        .job_repo
+        .count_by_tenant(tenant.0.id, q.status)
+        .await?;
+    Ok(Json(PaginatedResponse::new(
+        jobs, q.page, q.per_page, total,
+    )))
 }
 
 pub async fn get_job(

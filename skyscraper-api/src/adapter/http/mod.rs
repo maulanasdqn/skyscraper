@@ -1,9 +1,11 @@
 pub mod admin;
 pub mod auth;
+pub mod crawl;
 pub mod error;
 pub mod health;
 pub mod jobs;
 pub mod middleware;
+pub mod pagination;
 pub mod results;
 pub mod tenants;
 pub mod usage;
@@ -18,7 +20,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::domain::port::{
-    CarrierClient, JobQueue, JobRepository, ScrapeService, TenantRepository, UsageRepository,
+    CarrierClient, JobQueue, JobRepository, ResponseCache, ScrapeService, TenantRepository,
+    UsageRepository,
 };
 use crate::infrastructure::metrics::MetricsCollector;
 
@@ -35,6 +38,7 @@ pub struct AppState {
     pub queue: Arc<dyn JobQueue>,
     pub carrier_client: Arc<dyn CarrierClient>,
     pub scrape_service: Arc<dyn ScrapeService>,
+    pub response_cache: Arc<dyn ResponseCache>,
     pub parallax_config: ParallaxConfig,
     pub admin_key: String,
     pub metrics: Arc<MetricsCollector>,
@@ -54,7 +58,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/queue/stats", get(admin::queue_stats))
         .route("/queue/retry-dead", post(admin::retry_dead))
         .route("/carriers", get(admin::list_carriers))
-        .route("/metrics", get(admin::metrics));
+        .route("/metrics", get(admin::metrics))
+        .route("/cache", get(admin::cache_stats).delete(admin::cache_flush));
 
     let authenticated_routes = Router::new()
         .route("/scrape", post(jobs::scrape_sync))
@@ -63,7 +68,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/jobs/{id}", get(jobs::get_job).delete(jobs::cancel_job))
         .route("/results/{job_id}", get(results::get_result))
         .route("/results/{job_id}/screenshot", get(results::get_screenshot))
-        .route("/usage", get(usage::get_usage));
+        .route("/usage", get(usage::get_usage))
+        .route("/crawl", post(crawl::create_crawl));
 
     Router::new()
         .route("/api/v1/health", get(health::health))

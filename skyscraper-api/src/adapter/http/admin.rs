@@ -7,7 +7,7 @@ use serde::Deserialize;
 use super::auth::AdminAuth;
 use super::error::ApiResult;
 use super::AppState;
-use crate::domain::entity::{CarrierInfo, QueueStats};
+use crate::domain::entity::{CacheStats, CarrierInfo, QueueStats};
 
 pub async fn queue_stats(
     _admin: AdminAuth,
@@ -49,4 +49,20 @@ pub async fn metrics(
     State(state): State<Arc<AppState>>,
 ) -> Json<crate::infrastructure::metrics::Metrics> {
     Json(state.metrics.snapshot())
+}
+
+pub async fn cache_stats(
+    _admin: AdminAuth,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<CacheStats>> {
+    let result = state.response_cache.stats().await?;
+    Ok(Json(result))
+}
+
+pub async fn cache_flush(
+    _admin: AdminAuth,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let flushed = state.response_cache.flush().await?;
+    Ok(Json(serde_json::json!({ "flushed": flushed })))
 }

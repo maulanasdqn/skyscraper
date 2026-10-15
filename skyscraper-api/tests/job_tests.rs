@@ -13,7 +13,7 @@ use skyscraper::infrastructure::metrics::MetricsCollector;
 
 use common::{
     body_json, test_app_with_tenant, test_tenant, MockCarrierClient, MockJobQueue,
-    MockJobRepository, MockUsageRepository,
+    MockJobRepository, MockResponseCache, MockUsageRepository,
 };
 
 fn build_stateful_app(
@@ -33,6 +33,7 @@ fn build_stateful_app(
         queue,
         carrier_client: Arc::new(MockCarrierClient),
         scrape_service,
+        response_cache: Arc::new(MockResponseCache),
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),
             proxy_port: 1080,
@@ -63,7 +64,9 @@ async fn list_jobs_empty() {
 
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp.into_body()).await;
-    assert!(body.as_array().unwrap().is_empty());
+    assert!(body["data"].as_array().unwrap().is_empty());
+    assert_eq!(body["pagination"]["page"], 1);
+    assert_eq!(body["pagination"]["total"], 0);
 }
 
 #[tokio::test]
@@ -129,9 +132,10 @@ async fn create_job_and_list() {
 
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp.into_body()).await;
-    let arr = body.as_array().unwrap();
+    let arr = body["data"].as_array().unwrap();
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["id"].as_str().unwrap(), job_id);
+    assert_eq!(body["pagination"]["total"], 1);
 }
 
 #[tokio::test]

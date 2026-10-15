@@ -9,7 +9,8 @@ use tracing_subscriber::EnvFilter;
 use skyscraper::adapter::http::{self, AppState, ParallaxConfig};
 use skyscraper::adapter::postgres::{PgJobRepository, PgTenantRepository, PgUsageRepository};
 use skyscraper::application::scrape_service::ScrapeServiceImpl;
-use skyscraper::domain::port::JobQueue;
+use skyscraper::domain::port::{JobQueue, ResponseCache};
+use skyscraper::infrastructure::cache::RedisResponseCache;
 use skyscraper::infrastructure::clients::parallax::ParallaxClient;
 use skyscraper::infrastructure::metrics::MetricsCollector;
 use skyscraper::infrastructure::queue::redis_queue::RedisQueue;
@@ -49,6 +50,7 @@ async fn main() -> Result<()> {
     let parallax_proxy_port: u16 = env_or("PARALLAX_PROXY_PORT", "1080").parse()?;
     let proxy_pass = required_env("PROXY_PASS")?;
     let listen: SocketAddr = env_or("API_LISTEN", "0.0.0.0:3002").parse()?;
+    let cache_ttl: u64 = env_or("CACHE_TTL_SECS", "300").parse()?;
 
     let pool = PgPoolOptions::new()
         .max_connections(20)
@@ -62,6 +64,14 @@ async fn main() -> Result<()> {
         .context("failed to run migrations")?;
 
     let queue: Arc<dyn JobQueue> = Arc::new(RedisQueue::new(&redis_url).await?);
+
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).context("failed to open redis for cache")?;
+    let cache_conn = redis::aio::ConnectionManager::new(redis_client)
+        .await
+        .context("failed to connect redis for cache")?;
+    let response_cache: Arc<dyn ResponseCache> =
+        Arc::new(RedisResponseCache::new(cache_conn, cache_ttl));
 
     let tenant_repo = Arc::new(PgTenantRepository::new(pool.clone()));
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
@@ -77,6 +87,7 @@ async fn main() -> Result<()> {
         queue,
         carrier_client,
         scrape_service,
+        response_cache,
         parallax_config: ParallaxConfig {
             proxy_host: parallax_proxy_host,
             proxy_port: parallax_proxy_port,

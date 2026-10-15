@@ -57,6 +57,17 @@ impl JobQueue for MockJobQueue {
     ) -> Result<bool, DomainError> {
         Ok(self.rate_limit_result)
     }
+    async fn rate_limit_info(
+        &self,
+        _tenant_id: &Uuid,
+        limit_rpm: i32,
+    ) -> Result<RateLimitInfo, DomainError> {
+        Ok(RateLimitInfo {
+            limit: limit_rpm,
+            remaining: i64::from(limit_rpm),
+            reset_epoch: 0,
+        })
+    }
     async fn queue_stats(&self) -> Result<QueueStats, DomainError> {
         Ok(QueueStats {
             pending: 0,
@@ -175,9 +186,26 @@ impl JobRepository for MockJobRepository {
         Ok(self.running_count)
     }
 
+    async fn count_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        status: Option<JobStatus>,
+    ) -> Result<i64, DomainError> {
+        let jobs = self.jobs.lock().unwrap();
+        Ok(jobs
+            .iter()
+            .filter(|j| j.tenant_id == tenant_id)
+            .filter(|j| status.is_none_or(|s| j.status == s))
+            .count() as i64)
+    }
+
     async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
         let mut jobs = self.jobs.lock().unwrap();
         jobs.retain(|j| j.id != id);
         Ok(())
+    }
+
+    async fn delete_completed_before(&self, _before: DateTime<Utc>) -> Result<u64, DomainError> {
+        Ok(0)
     }
 }

@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::entity::{
-    CarrierInfo, Job, QueueStats, ScrapeJobRequest, ScrapeJobResult, Tenant, TenantPlan,
-    UsageRecord,
+    CacheStats, CarrierInfo, Job, QueueStats, RateLimitInfo, ScrapeJobRequest, ScrapeJobResult,
+    Tenant, TenantPlan, UsageRecord,
 };
 use super::error::DomainError;
 use super::job_status::JobStatus;
@@ -51,7 +51,9 @@ pub trait JobRepository: Send + Sync {
     async fn set_failed(&self, id: Uuid, error: &str, attempts: i32) -> Result<()>;
     async fn set_status(&self, id: Uuid, status: JobStatus) -> Result<()>;
     async fn count_running_for_tenant(&self, tenant_id: Uuid) -> Result<i64>;
+    async fn count_by_tenant(&self, tenant_id: Uuid, status: Option<JobStatus>) -> Result<i64>;
     async fn delete(&self, id: Uuid) -> Result<()>;
+    async fn delete_completed_before(&self, before: DateTime<Utc>) -> Result<u64>;
 }
 
 #[async_trait]
@@ -129,6 +131,7 @@ pub trait JobQueue: Send + Sync {
     async fn promote_scheduled(&self) -> Result<u64>;
     async fn reclaim_stale(&self, max_age_secs: u64) -> Result<u64>;
     async fn check_rate_limit(&self, tenant_id: &Uuid, limit_rpm: i32) -> Result<bool>;
+    async fn rate_limit_info(&self, tenant_id: &Uuid, limit_rpm: i32) -> Result<RateLimitInfo>;
     async fn queue_stats(&self) -> Result<QueueStats>;
     async fn retry_dead(&self, limit: usize) -> Result<u64>;
 }
@@ -137,4 +140,6 @@ pub trait JobQueue: Send + Sync {
 pub trait ResponseCache: Send + Sync {
     async fn get(&self, url: &str) -> Result<Option<ScrapeJobResult>>;
     async fn set(&self, url: &str, result: &ScrapeJobResult, ttl_secs: Option<u64>) -> Result<()>;
+    async fn flush(&self) -> Result<u64>;
+    async fn stats(&self) -> Result<CacheStats>;
 }

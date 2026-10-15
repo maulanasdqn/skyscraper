@@ -3,7 +3,7 @@ use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
 use uuid::Uuid;
 
-use crate::domain::entity::QueueStats;
+use crate::domain::entity::{QueueStats, RateLimitInfo};
 use crate::domain::error::DomainError;
 use crate::domain::port::JobQueue;
 
@@ -190,6 +190,43 @@ impl JobQueue for RedisQueue {
             .map_err(|e| DomainError::Upstream(format!("redis rate limit: {e}")))?;
 
         Ok(count <= i64::from(limit_rpm))
+    }
+
+    async fn rate_limit_info(
+        &self,
+        tenant_id: &Uuid,
+        limit_rpm: i32,
+    ) -> Result<RateLimitInfo, DomainError> {
+        let key = format!("skyscraper:rate:{tenant_id}");
+        let mut conn = self.conn.clone();
+
+        let script = redis::Script::new(
+            r"
+            local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+            local ttl = redis.call('TTL', KEYS[1])
+            if ttl < 0 then ttl = 60 end
+            return {count, ttl}
+            ",
+        );
+
+        let (count, ttl): (i64, i64) = script
+            .key(&key)
+            .invoke_async(&mut conn)
+            .await
+            .map_err(|e| DomainError::Upstream(format!("redis rate limit info: {e}")))?;
+
+        let limit = i64::from(limit_rpm);
+        let remaining = (limit - count).max(0);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+
+        Ok(RateLimitInfo {
+            limit: limit_rpm,
+            remaining,
+            reset_epoch: now + ttl,
+        })
     }
 
     async fn retry_dead(&self, limit: usize) -> Result<u64, DomainError> {

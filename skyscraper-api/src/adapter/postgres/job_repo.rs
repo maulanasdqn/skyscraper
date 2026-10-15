@@ -205,6 +205,34 @@ impl JobRepository for PgJobRepository {
         Ok(row.0)
     }
 
+    async fn count_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        status: Option<JobStatus>,
+    ) -> Result<i64, DomainError> {
+        let row: (i64,) = match status {
+            Some(s) => {
+                sqlx::query_as(
+                    "SELECT COUNT(*) FROM jobs \
+                     WHERE tenant_id = $1 AND status = $2::job_status",
+                )
+                .bind(tenant_id)
+                .bind(s)
+                .fetch_one(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query_as("SELECT COUNT(*) FROM jobs WHERE tenant_id = $1")
+                    .bind(tenant_id)
+                    .fetch_one(&self.pool)
+                    .await
+            }
+        }
+        .map_err(map_sqlx_error)?;
+
+        Ok(row.0)
+    }
+
     async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
         let affected = sqlx::query("DELETE FROM jobs WHERE id = $1")
             .bind(id)
@@ -216,5 +244,19 @@ impl JobRepository for PgJobRepository {
             return Err(DomainError::NotFound(format!("job {id}")));
         }
         Ok(())
+    }
+
+    async fn delete_completed_before(&self, before: DateTime<Utc>) -> Result<u64, DomainError> {
+        let result = sqlx::query(
+            "DELETE FROM jobs \
+             WHERE status IN ('completed'::job_status, 'dead'::job_status) \
+             AND completed_at < $1",
+        )
+        .bind(before)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+
+        Ok(result.rows_affected())
     }
 }

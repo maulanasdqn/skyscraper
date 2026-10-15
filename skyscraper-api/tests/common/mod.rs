@@ -10,12 +10,15 @@ use http_body_util::BodyExt;
 use uuid::Uuid;
 
 use skyscraper::adapter::http::{router, AppState, ParallaxConfig};
+use skyscraper::domain::entity::{CacheStats, ScrapeJobResult};
 use skyscraper::domain::entity::{
-    CarrierInfo, Job, QueueStats, ScrapeJobRequest, Tenant, TenantPlan,
+    CarrierInfo, Job, QueueStats, RateLimitInfo, ScrapeJobRequest, Tenant, TenantPlan,
 };
 use skyscraper::domain::error::DomainError;
 use skyscraper::domain::job_status::JobStatus;
-use skyscraper::domain::port::{CarrierClient, JobQueue, JobRepository, ScrapeService};
+use skyscraper::domain::port::{
+    CarrierClient, JobQueue, JobRepository, ResponseCache, ScrapeService,
+};
 use skyscraper::infrastructure::metrics::MetricsCollector;
 
 pub use mocks::{MockJobRepository, MockTenantRepository, MockUsageRepository};
@@ -62,6 +65,17 @@ impl JobQueue for MockJobQueue {
         _limit_rpm: i32,
     ) -> Result<bool, DomainError> {
         Ok(true)
+    }
+    async fn rate_limit_info(
+        &self,
+        _tenant_id: &Uuid,
+        limit_rpm: i32,
+    ) -> Result<RateLimitInfo, DomainError> {
+        Ok(RateLimitInfo {
+            limit: limit_rpm,
+            remaining: i64::from(limit_rpm),
+            reset_epoch: 0,
+        })
     }
     async fn queue_stats(&self) -> Result<QueueStats, DomainError> {
         Ok(QueueStats {
@@ -151,6 +165,32 @@ impl ScrapeService for MockScrapeService {
     }
 }
 
+pub struct MockResponseCache;
+
+#[async_trait]
+impl ResponseCache for MockResponseCache {
+    async fn get(&self, _url: &str) -> Result<Option<ScrapeJobResult>, DomainError> {
+        Ok(None)
+    }
+    async fn set(
+        &self,
+        _url: &str,
+        _result: &ScrapeJobResult,
+        _ttl_secs: Option<u64>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn flush(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn stats(&self) -> Result<CacheStats, DomainError> {
+        Ok(CacheStats {
+            keys: 0,
+            memory_bytes: 0,
+        })
+    }
+}
+
 pub struct MockCarrierClient;
 
 #[async_trait]
@@ -202,6 +242,7 @@ pub fn test_app_with_tenant_repo(tenant_repo: Arc<MockTenantRepository>) -> Rout
         queue,
         carrier_client: Arc::new(MockCarrierClient),
         scrape_service,
+        response_cache: Arc::new(MockResponseCache),
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),
             proxy_port: 1080,

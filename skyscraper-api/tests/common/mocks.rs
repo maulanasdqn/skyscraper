@@ -237,6 +237,19 @@ impl JobRepository for MockJobRepository {
             .count() as i64)
     }
 
+    async fn count_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        status: Option<JobStatus>,
+    ) -> Result<i64, DomainError> {
+        let jobs = self.jobs.lock().unwrap();
+        Ok(jobs
+            .iter()
+            .filter(|j| j.tenant_id == tenant_id)
+            .filter(|j| status.is_none_or(|s| j.status == s))
+            .count() as i64)
+    }
+
     async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
         let mut jobs = self.jobs.lock().unwrap();
         let len_before = jobs.len();
@@ -246,6 +259,10 @@ impl JobRepository for MockJobRepository {
         } else {
             Ok(())
         }
+    }
+
+    async fn delete_completed_before(&self, _before: DateTime<Utc>) -> Result<u64, DomainError> {
+        Ok(0)
     }
 }
 
