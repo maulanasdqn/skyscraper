@@ -12,22 +12,37 @@
   let job = $state<Job | null>(null)
   let loading = $state(true)
   let error = $state('')
+  let pollTimer = $state<ReturnType<typeof setInterval> | null>(null)
+
+  const TERMINAL = new Set(['completed', 'failed', 'dead'])
 
   const statusBadge: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow',
     failed: 'red', dead: 'gray', scheduled: 'blue',
   }
 
-  async function load() {
+  let isLive = $derived(!!job && !TERMINAL.has(job.status))
+
+  async function load(silent = false) {
     if (!jobId) { error = 'No job ID'; loading = false; return }
-    loading = true
+    if (!silent) loading = true
     try {
       const key = await ensureTenant()
       job = await getJob(key, jobId)
+      if (job && TERMINAL.has(job.status)) stopPoll()
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load job'
     }
-    loading = false
+    if (!silent) loading = false
+  }
+
+  function startPoll() {
+    stopPoll()
+    pollTimer = setInterval(() => load(true), 1000)
+  }
+
+  function stopPoll() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   }
 
   async function handleCancel() {
@@ -40,7 +55,10 @@
     if (key && job) { await retryJob(key, job.id); load() }
   }
 
-  $effect(() => { if (jobId) load() })
+  $effect(() => {
+    if (jobId) { load().then(() => { if (isLive) startPoll() }) }
+    return () => stopPoll()
+  })
 </script>
 
 <div class="space-y-4">
@@ -56,6 +74,15 @@
     <div class="flex items-center gap-3 mb-2">
       <h2 class="text-lg font-semibold text-gray-100 font-mono">{job.id.slice(0, 12)}…</h2>
       <Badge text={job.status} color={statusBadge[job.status] ?? 'gray'} />
+      {#if isLive}
+        <span class="flex items-center gap-1.5 text-xs text-emerald-400">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          Live
+        </span>
+      {/if}
       <div class="ml-auto flex gap-2">
         {#if job.status === 'pending'}
           <Button size="sm" variant="danger" onclick={handleCancel}>Cancel</Button>

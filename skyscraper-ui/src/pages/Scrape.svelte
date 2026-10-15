@@ -16,7 +16,7 @@
   let includeHtml = $state(false)
   let headful = $state(false)
   let geo = $state('')
-  let mode = $state<'async' | 'sync'>('async')
+  let mode = $state<'async' | 'sync'>('sync')
   let batchMode = $state(false)
   let batchUrls = $state('')
 
@@ -56,6 +56,8 @@
         if (!url) { result = { error: 'Enter a URL' }; return }
         const job = await submitJob(key, buildRequest(url))
         result = { job }
+        window.location.hash = `jobs/${job.id}`
+        return
       }
     } catch (e) {
       result = { error: e instanceof Error ? e.message : 'Scrape failed' }
