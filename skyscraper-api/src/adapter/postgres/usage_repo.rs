@@ -44,7 +44,7 @@ impl UsageRepository for PgUsageRepository {
         since: DateTime<Utc>,
     ) -> Result<i64, DomainError> {
         let row: (Option<i64>,) = sqlx::query_as(
-            "SELECT SUM(bytes_consumed) FROM usage_records \
+            "SELECT COALESCE(SUM(bytes_consumed), 0)::BIGINT FROM usage_records \
              WHERE tenant_id = $1 AND recorded_at >= $2",
         )
         .bind(tenant_id)

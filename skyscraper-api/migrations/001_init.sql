@@ -1,10 +1,8 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TYPE tenant_plan AS ENUM ('free', 'starter', 'pro', 'business');
 CREATE TYPE job_status AS ENUM ('pending', 'scheduled', 'running', 'completed', 'failed', 'dead');
 
 CREATE TABLE tenants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL UNIQUE,
     api_key TEXT NOT NULL UNIQUE,
     plan tenant_plan NOT NULL DEFAULT 'free',
@@ -16,7 +14,7 @@ CREATE TABLE tenants (
 );
 
 CREATE TABLE jobs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     status job_status NOT NULL DEFAULT 'pending',
     priority SMALLINT NOT NULL DEFAULT 5,
@@ -34,7 +32,7 @@ CREATE TABLE jobs (
 );
 
 CREATE TABLE usage_records (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
     bytes_consumed BIGINT NOT NULL DEFAULT 0,
