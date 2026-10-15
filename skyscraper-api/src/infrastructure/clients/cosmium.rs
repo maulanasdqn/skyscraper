@@ -14,6 +14,7 @@ use crate::infrastructure::circuit_breaker::CircuitBreaker;
 pub struct CosmiumClient {
     client: Client,
     base_url: String,
+    api_key: Option<String>,
     profile_cache: Arc<RwLock<Option<CachedProfiles>>>,
     circuit_breaker: CircuitBreaker,
 }
@@ -26,7 +27,7 @@ struct CachedProfiles {
 const PROFILE_CACHE_TTL: Duration = Duration::from_mins(1);
 
 impl CosmiumClient {
-    pub fn new(base_url: &str) -> Self {
+    pub fn new(base_url: &str, api_key: Option<String>) -> Self {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(90))
@@ -39,8 +40,16 @@ impl CosmiumClient {
         Self {
             client,
             base_url: base_url.trim_end_matches('/').to_string(),
+            api_key,
             profile_cache: Arc::new(RwLock::new(None)),
             circuit_breaker: CircuitBreaker::new("cosmium", 5, Duration::from_secs(30)),
+        }
+    }
+
+    fn request_builder(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.api_key {
+            Some(key) => req.header("X-Api-Key", key),
+            None => req,
         }
     }
 }
@@ -77,9 +86,11 @@ impl ScrapeClient for CosmiumClient {
         };
 
         let resp = self
-            .client
-            .post(format!("{}/api/v1/scrape", self.base_url))
-            .json(&body)
+            .request_builder(
+                self.client
+                    .post(format!("{}/api/v1/scrape", self.base_url))
+                    .json(&body),
+            )
             .send()
             .await
             .map_err(|e| {
@@ -159,8 +170,9 @@ impl ScrapeClient for CosmiumClient {
 impl CosmiumClient {
     async fn fetch_profiles(&self) -> Result<Vec<String>, DomainError> {
         let resp = self
-            .client
-            .get(format!("{}/api/v1/profiles", self.base_url))
+            .request_builder(
+                self.client.get(format!("{}/api/v1/profiles", self.base_url)),
+            )
             .send()
             .await
             .map_err(|e| DomainError::Upstream(format!("cosmium profiles: {e}")))?;
@@ -172,8 +184,17 @@ impl CosmiumClient {
             )));
         }
 
-        resp.json()
+        let body: serde_json::Value = resp
+            .json()
             .await
-            .map_err(|e| DomainError::Upstream(format!("cosmium profiles decode: {e}")))
+            .map_err(|e| DomainError::Upstream(format!("cosmium profiles decode: {e}")))?;
+
+        if let Some(arr) = body.get("profiles").and_then(|v| v.as_array()) {
+            Ok(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        } else if let Ok(list) = serde_json::from_value::<Vec<String>>(body) {
+            Ok(list)
+        } else {
+            Ok(vec![])
+        }
     }
 }

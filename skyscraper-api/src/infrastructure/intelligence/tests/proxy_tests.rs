@@ -66,14 +66,14 @@ async fn proxy_auto_prefers_geo_match() {
 }
 
 #[tokio::test]
-async fn proxy_auto_no_online_carriers_returns_error() {
+async fn proxy_auto_no_online_carriers_returns_none() {
     let selector = make_selector(vec![
         make_carrier("tmobile", "US", false),
         make_carrier("vodafone", "DE", false),
     ]);
     let req = make_request(ProxyStrategy::Auto, ProfileStrategy::Auto, None);
-    let err = selector.select(&req).await.unwrap_err();
-    assert!(matches!(err, DomainError::Upstream(_)));
+    let result = selector.select(&req).await.unwrap();
+    assert!(result.is_none());
 }
 
 #[tokio::test]

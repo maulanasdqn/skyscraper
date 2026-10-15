@@ -54,6 +54,7 @@ async fn main() -> Result<()> {
     let parallax_proxy_port: u16 = env_or("PARALLAX_PROXY_PORT", "1080").parse()?;
     let proxy_pass = required_env("PROXY_PASS")?;
     let cosmium_url = env_or("COSMIUM_URL", "http://localhost:3000");
+    let cosmium_api_key = std::env::var("COSMIUM_API_KEY").ok();
     let concurrency: usize = env_or("WORKER_CONCURRENCY", "4").parse()?;
     let cache_ttl: u64 = env_or("CACHE_TTL_SECS", "300").parse()?;
     let domain_max_rpm: u32 = env_or("DOMAIN_MAX_RPM", "30").parse()?;
@@ -85,7 +86,7 @@ async fn main() -> Result<()> {
     let webhook = Arc::new(WebhookDelivery::new());
 
     let parallax_client: Arc<ParallaxClient> = Arc::new(ParallaxClient::new(&parallax_url));
-    let cosmium_client: Arc<CosmiumClient> = Arc::new(CosmiumClient::new(&cosmium_url));
+    let cosmium_client: Arc<CosmiumClient> = Arc::new(CosmiumClient::new(&cosmium_url, cosmium_api_key));
 
     let proxy_selector: Arc<dyn ProxySelection> = Arc::new(ProxySelector::new(
         parallax_client,

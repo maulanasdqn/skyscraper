@@ -50,10 +50,10 @@ impl ProxySelector {
                 Ok(Some(self.build_proxy_url(&carrier.name)))
             }
             ProxyStrategy::Auto => {
-                let carriers = self.carrier_client.list_carriers().await?;
+                let carriers = self.carrier_client.list_carriers().await.unwrap_or_default();
                 let online: Vec<_> = carriers.iter().filter(|c| c.online).collect();
                 if online.is_empty() {
-                    return Err(DomainError::Upstream("no online carriers available".into()));
+                    return Ok(None);
                 }
 
                 let geo_filtered: Vec<_> = if let Some(ref geo) = request.geo {
