@@ -52,8 +52,17 @@ pub trait JobRepository: Send + Sync {
     async fn set_status(&self, id: Uuid, status: JobStatus) -> Result<()>;
     async fn count_running_for_tenant(&self, tenant_id: Uuid) -> Result<i64>;
     async fn count_by_tenant(&self, tenant_id: Uuid, status: Option<JobStatus>) -> Result<i64>;
+    async fn update_priority(&self, id: Uuid, priority: i16) -> Result<()>;
     async fn delete(&self, id: Uuid) -> Result<()>;
     async fn delete_completed_before(&self, before: DateTime<Utc>) -> Result<u64>;
+    async fn list_all(
+        &self,
+        status: Option<JobStatus>,
+        tenant_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Job>>;
+    async fn count_all(&self, status: Option<JobStatus>, tenant_id: Option<Uuid>) -> Result<i64>;
 }
 
 #[async_trait]
@@ -119,6 +128,8 @@ pub trait ScrapeService: Send + Sync {
     ) -> Result<Vec<Job>>;
 
     async fn cancel_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<()>;
+    async fn retry_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<Job>;
+    async fn update_priority(&self, tenant_id: Uuid, job_id: Uuid, priority: i16) -> Result<()>;
 }
 
 #[async_trait]

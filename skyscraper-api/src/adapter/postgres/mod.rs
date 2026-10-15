@@ -1,4 +1,5 @@
 mod job_repo;
+mod job_repo_queries;
 mod tenant_repo;
 mod usage_repo;
 

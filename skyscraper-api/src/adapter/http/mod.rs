@@ -4,6 +4,7 @@ pub mod crawl;
 pub mod error;
 pub mod health;
 pub mod jobs;
+pub mod jobs_extra;
 pub mod middleware;
 pub mod pagination;
 pub mod results;
@@ -59,13 +60,16 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/queue/retry-dead", post(admin::retry_dead))
         .route("/carriers", get(admin::list_carriers))
         .route("/metrics", get(admin::metrics))
-        .route("/cache", get(admin::cache_stats).delete(admin::cache_flush));
+        .route("/cache", get(admin::cache_stats).delete(admin::cache_flush))
+        .route("/jobs", get(admin::list_all_jobs));
 
     let authenticated_routes = Router::new()
-        .route("/scrape", post(jobs::scrape_sync))
+        .route("/scrape", post(jobs_extra::scrape_sync))
         .route("/jobs", get(jobs::list_jobs).post(jobs::create_job))
-        .route("/jobs/batch", post(jobs::create_batch))
+        .route("/jobs/batch", post(jobs_extra::create_batch))
         .route("/jobs/{id}", get(jobs::get_job).delete(jobs::cancel_job))
+        .route("/jobs/{id}/retry", post(jobs_extra::retry_job))
+        .route("/jobs/{id}/priority", patch(jobs_extra::update_priority))
         .route("/results/{job_id}", get(results::get_result))
         .route("/results/{job_id}/screenshot", get(results::get_screenshot))
         .route("/usage", get(usage::get_usage))

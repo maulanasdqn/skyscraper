@@ -77,7 +77,11 @@ async fn main() -> Result<()> {
     let job_repo = Arc::new(PgJobRepository::new(pool.clone()));
     let usage_repo = Arc::new(PgUsageRepository::new(pool.clone()));
     let carrier_client = Arc::new(ParallaxClient::new(&parallax_url));
-    let scrape_service = Arc::new(ScrapeServiceImpl::new(job_repo.clone(), queue.clone()));
+    let scrape_service = Arc::new(ScrapeServiceImpl::new(
+        job_repo.clone(),
+        queue.clone(),
+        usage_repo.clone(),
+    ));
     let metrics = Arc::new(MetricsCollector::new());
 
     let state = Arc::new(AppState {

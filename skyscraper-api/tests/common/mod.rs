@@ -1,3 +1,5 @@
+pub mod mock_job_repo;
+pub mod mock_services;
 pub mod mocks;
 
 use std::sync::{Arc, Mutex};
@@ -5,23 +7,19 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use axum::body::Body;
 use axum::Router;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use http_body_util::BodyExt;
 use uuid::Uuid;
 
 use skyscraper::adapter::http::{router, AppState, ParallaxConfig};
-use skyscraper::domain::entity::{CacheStats, ScrapeJobResult};
-use skyscraper::domain::entity::{
-    CarrierInfo, Job, QueueStats, RateLimitInfo, ScrapeJobRequest, Tenant, TenantPlan,
-};
+use skyscraper::domain::entity::{QueueStats, RateLimitInfo, Tenant, TenantPlan};
 use skyscraper::domain::error::DomainError;
-use skyscraper::domain::job_status::JobStatus;
-use skyscraper::domain::port::{
-    CarrierClient, JobQueue, JobRepository, ResponseCache, ScrapeService,
-};
+use skyscraper::domain::port::JobQueue;
 use skyscraper::infrastructure::metrics::MetricsCollector;
 
-pub use mocks::{MockJobRepository, MockTenantRepository, MockUsageRepository};
+pub use mock_job_repo::MockJobRepository;
+pub use mock_services::{MockCarrierClient, MockResponseCache, MockScrapeService};
+pub use mocks::{MockTenantRepository, MockUsageRepository};
 
 pub struct MockJobQueue {
     pub enqueued: Mutex<Vec<Uuid>>,
@@ -41,34 +39,30 @@ impl JobQueue for MockJobQueue {
         self.enqueued.lock().unwrap().push(job_id);
         Ok(())
     }
-    async fn schedule(&self, _job_id: Uuid, _run_at_epoch: f64) -> Result<(), DomainError> {
+    async fn schedule(&self, _: Uuid, _: f64) -> Result<(), DomainError> {
         Ok(())
     }
-    async fn dequeue(&self, _timeout_secs: f64) -> Result<Option<Uuid>, DomainError> {
+    async fn dequeue(&self, _: f64) -> Result<Option<Uuid>, DomainError> {
         Ok(None)
     }
-    async fn ack(&self, _job_id: Uuid) -> Result<(), DomainError> {
+    async fn ack(&self, _: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
-    async fn move_to_dead(&self, _job_id: Uuid) -> Result<(), DomainError> {
+    async fn move_to_dead(&self, _: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
     async fn promote_scheduled(&self) -> Result<u64, DomainError> {
         Ok(0)
     }
-    async fn reclaim_stale(&self, _max_age_secs: u64) -> Result<u64, DomainError> {
+    async fn reclaim_stale(&self, _: u64) -> Result<u64, DomainError> {
         Ok(0)
     }
-    async fn check_rate_limit(
-        &self,
-        _tenant_id: &Uuid,
-        _limit_rpm: i32,
-    ) -> Result<bool, DomainError> {
+    async fn check_rate_limit(&self, _: &Uuid, _: i32) -> Result<bool, DomainError> {
         Ok(true)
     }
     async fn rate_limit_info(
         &self,
-        _tenant_id: &Uuid,
+        _: &Uuid,
         limit_rpm: i32,
     ) -> Result<RateLimitInfo, DomainError> {
         Ok(RateLimitInfo {
@@ -88,121 +82,8 @@ impl JobQueue for MockJobQueue {
             dead: 0,
         })
     }
-    async fn retry_dead(&self, _limit: usize) -> Result<u64, DomainError> {
+    async fn retry_dead(&self, _: usize) -> Result<u64, DomainError> {
         Ok(0)
-    }
-}
-
-pub struct MockScrapeService {
-    pub job_repo: Arc<MockJobRepository>,
-    pub queue: Arc<MockJobQueue>,
-}
-
-#[async_trait]
-impl ScrapeService for MockScrapeService {
-    async fn submit_job(
-        &self,
-        tenant: &Tenant,
-        request: &ScrapeJobRequest,
-        priority: i16,
-        max_retries: i32,
-        scheduled_at: Option<DateTime<Utc>>,
-    ) -> Result<Job, DomainError> {
-        if request.url.is_empty() {
-            return Err(DomainError::InvalidInput("url is required".into()));
-        }
-        let allowed = self
-            .queue
-            .check_rate_limit(&tenant.id, tenant.rate_limit_rpm)
-            .await?;
-        if !allowed {
-            return Err(DomainError::RateLimitExceeded);
-        }
-        let job = self
-            .job_repo
-            .create(tenant.id, request, priority, max_retries, scheduled_at)
-            .await?;
-        if let Some(sa) = job.scheduled_at {
-            self.queue.schedule(job.id, sa.timestamp() as f64).await?;
-        } else {
-            self.queue.enqueue(job.id, priority).await?;
-        }
-        Ok(job)
-    }
-
-    async fn get_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<Job, DomainError> {
-        let job = self
-            .job_repo
-            .find_by_id(job_id)
-            .await?
-            .ok_or_else(|| DomainError::NotFound("job not found".into()))?;
-        if job.tenant_id != tenant_id {
-            return Err(DomainError::NotFound("job not found".into()));
-        }
-        Ok(job)
-    }
-
-    async fn list_jobs(
-        &self,
-        tenant_id: Uuid,
-        status: Option<JobStatus>,
-        limit: i64,
-        offset: i64,
-    ) -> Result<Vec<Job>, DomainError> {
-        self.job_repo
-            .list_by_tenant(tenant_id, status, limit, offset)
-            .await
-    }
-
-    async fn cancel_job(&self, tenant_id: Uuid, job_id: Uuid) -> Result<(), DomainError> {
-        let job = self.get_job(tenant_id, job_id).await?;
-        if job.status != JobStatus::Pending && job.status != JobStatus::Scheduled {
-            return Err(DomainError::InvalidInput(
-                "can only cancel pending or scheduled jobs".into(),
-            ));
-        }
-        self.job_repo.delete(job_id).await
-    }
-}
-
-pub struct MockResponseCache;
-
-#[async_trait]
-impl ResponseCache for MockResponseCache {
-    async fn get(&self, _url: &str) -> Result<Option<ScrapeJobResult>, DomainError> {
-        Ok(None)
-    }
-    async fn set(
-        &self,
-        _url: &str,
-        _result: &ScrapeJobResult,
-        _ttl_secs: Option<u64>,
-    ) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn flush(&self) -> Result<u64, DomainError> {
-        Ok(0)
-    }
-    async fn stats(&self) -> Result<CacheStats, DomainError> {
-        Ok(CacheStats {
-            keys: 0,
-            memory_bytes: 0,
-        })
-    }
-}
-
-pub struct MockCarrierClient;
-
-#[async_trait]
-impl CarrierClient for MockCarrierClient {
-    async fn list_carriers(&self) -> Result<Vec<CarrierInfo>, DomainError> {
-        Ok(vec![CarrierInfo {
-            id: Uuid::new_v4(),
-            name: "test-carrier".into(),
-            country: "US".into(),
-            upstream_addr: "127.0.0.1:1080".into(),
-            online: true,
-        }])
     }
 }
 
@@ -231,7 +112,7 @@ pub fn test_app_with_tenant(tenant: Tenant) -> Router {
 pub fn test_app_with_tenant_repo(tenant_repo: Arc<MockTenantRepository>) -> Router {
     let job_repo = Arc::new(MockJobRepository::new());
     let queue = Arc::new(MockJobQueue::new());
-    let scrape_service = Arc::new(MockScrapeService {
+    let svc = Arc::new(MockScrapeService {
         job_repo: job_repo.clone(),
         queue: queue.clone(),
     });
@@ -241,7 +122,7 @@ pub fn test_app_with_tenant_repo(tenant_repo: Arc<MockTenantRepository>) -> Rout
         usage_repo: Arc::new(MockUsageRepository),
         queue,
         carrier_client: Arc::new(MockCarrierClient),
-        scrape_service,
+        scrape_service: svc,
         response_cache: Arc::new(MockResponseCache),
         parallax_config: ParallaxConfig {
             proxy_host: "localhost".into(),

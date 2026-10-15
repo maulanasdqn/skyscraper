@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::warn;
 
-use crate::domain::entity::{ScrapeJobRequest, ScrapeJobResult, WorkflowStep};
+use super::cosmium_types::{CosmiumScrapeRequest, CosmiumScrapeResponse};
+use crate::domain::entity::{ScrapeJobRequest, ScrapeJobResult};
 use crate::domain::error::DomainError;
 use crate::domain::port::ScrapeClient;
 use crate::infrastructure::circuit_breaker::CircuitBreaker;
@@ -24,48 +24,6 @@ struct CachedProfiles {
 }
 
 const PROFILE_CACHE_TTL: Duration = Duration::from_mins(1);
-
-#[derive(Serialize)]
-struct CosmiumScrapeRequest<'a> {
-    url: &'a str,
-    profile: &'a str,
-    screenshot: bool,
-    headful: bool,
-    wait_ms: u32,
-    extract: &'a [String],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    script: &'a Option<String>,
-    #[serde(skip_serializing_if = "<[WorkflowStep]>::is_empty")]
-    workflow: &'a [WorkflowStep],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    proxy: Option<&'a str>,
-    include_html: bool,
-    retries: u32,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    geo_sync: bool,
-}
-
-#[derive(Deserialize)]
-struct CosmiumScrapeResponse {
-    final_url: String,
-    #[serde(default)]
-    status: i32,
-    #[serde(default)]
-    html_length: usize,
-    html: Option<String>,
-    #[serde(default)]
-    extracted: serde_json::Value,
-    screenshot_base64: Option<String>,
-    #[serde(default)]
-    blocked: bool,
-    proxy_used: Option<String>,
-    #[serde(default)]
-    profile_used: String,
-    #[serde(default)]
-    elapsed_ms: u64,
-    #[serde(default)]
-    attempts: i32,
-}
 
 impl CosmiumClient {
     pub fn new(base_url: &str) -> Self {

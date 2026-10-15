@@ -6,8 +6,10 @@ use serde::Deserialize;
 
 use super::auth::AdminAuth;
 use super::error::ApiResult;
+use super::pagination::PaginatedResponse;
 use super::AppState;
-use crate::domain::entity::{CacheStats, CarrierInfo, QueueStats};
+use crate::domain::entity::{CacheStats, CarrierInfo, Job, QueueStats};
+use crate::domain::job_status::JobStatus;
 
 pub async fn queue_stats(
     _admin: AdminAuth,
@@ -65,4 +67,37 @@ pub async fn cache_flush(
 ) -> ApiResult<Json<serde_json::Value>> {
     let flushed = state.response_cache.flush().await?;
     Ok(Json(serde_json::json!({ "flushed": flushed })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminJobsQuery {
+    pub status: Option<JobStatus>,
+    pub tenant_id: Option<uuid::Uuid>,
+    #[serde(default = "default_admin_page")]
+    pub page: i64,
+    #[serde(default = "default_admin_per_page")]
+    pub per_page: i64,
+}
+
+fn default_admin_page() -> i64 {
+    1
+}
+fn default_admin_per_page() -> i64 {
+    50
+}
+
+pub async fn list_all_jobs(
+    _admin: AdminAuth,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<AdminJobsQuery>,
+) -> ApiResult<Json<PaginatedResponse<Job>>> {
+    let offset = (q.page - 1) * q.per_page;
+    let jobs = state
+        .job_repo
+        .list_all(q.status, q.tenant_id, q.per_page, offset)
+        .await?;
+    let total = state.job_repo.count_all(q.status, q.tenant_id).await?;
+    Ok(Json(PaginatedResponse::new(
+        jobs, q.page, q.per_page, total,
+    )))
 }

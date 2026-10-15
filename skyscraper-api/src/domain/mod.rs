@@ -1,4 +1,5 @@
 pub mod entity;
+pub mod entity_ext;
 pub mod error;
 pub mod job_status;
 pub mod port;

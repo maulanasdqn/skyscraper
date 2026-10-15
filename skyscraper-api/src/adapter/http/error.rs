@@ -29,6 +29,7 @@ impl IntoResponse for ApiError {
             ),
             DomainError::TenantInactive => (StatusCode::FORBIDDEN, "tenant inactive".to_string()),
             DomainError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            DomainError::QuotaExceeded(msg) => (StatusCode::PAYMENT_REQUIRED, msg.clone()),
             DomainError::ScrapeBlocked => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "scrape blocked by target site".to_string(),

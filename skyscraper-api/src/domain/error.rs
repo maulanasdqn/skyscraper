@@ -16,6 +16,8 @@ pub enum DomainError {
     TenantInactive,
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    #[error("quota exceeded: {0}")]
+    QuotaExceeded(String),
     #[error("scrape blocked by target site")]
     ScrapeBlocked,
     #[error("upstream error: {0}")]
