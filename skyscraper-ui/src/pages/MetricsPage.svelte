@@ -1,11 +1,11 @@
 <script lang="ts">
-  import StatCard from '../components/ui/StatCard.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import { getAdminKey } from '../lib/stores/auth.svelte'
-  import { getMetrics, getQueueStats, getCacheStats, flushCache, retryDead } from '../lib/api/skyscraper'
-  import type { Metrics, QueueStats, CacheStats } from '../lib/types'
-  import { formatNumber } from '../lib/utils/format'
+  import StatCard from '@components/ui/StatCard.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import { getAdminKey } from '@lib/stores/auth.svelte'
+  import { getMetrics, getQueueStats, getCacheStats, flushCache, retryDead } from '@lib/api/skyscraper'
+  import type { Metrics, QueueStats, CacheStats } from '@lib/types'
+  import { formatNumber } from '@lib/utils/format'
 
   let metrics = $state<Metrics | null>(null)
   let queue = $state<QueueStats | null>(null)

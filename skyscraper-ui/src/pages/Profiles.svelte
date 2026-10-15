@@ -1,15 +1,15 @@
 <script lang="ts">
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Input from '../components/ui/Input.svelte'
-  import Modal from '../components/ui/Modal.svelte'
-  import { getCosmiumUrl, getCosmiumApiKey } from '../lib/stores/auth.svelte'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Input from '@components/ui/Input.svelte'
+  import Modal from '@components/ui/Modal.svelte'
+  import { getCosmiumUrl, getCosmiumApiKey } from '@lib/stores/auth.svelte'
   import {
     getCosmiumHealth, listProfiles, getProfile, deleteProfile,
     generateProfile, runFingerprintTest, runStealthTest,
     type CosmiumHealth,
-  } from '../lib/api/cosmium'
+  } from '@lib/api/cosmium'
 
   let health = $state<CosmiumHealth | null>(null)
   let profiles = $state<string[]>([])

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import { getAdminKey, getParallaxUrl } from '../lib/stores/auth.svelte'
-  import { listCarriers } from '../lib/api/skyscraper'
-  import { getParallaxCarriers, listUsers, listSessions, toggleUser, deleteUser } from '../lib/api/parallax'
-  import type { Carrier } from '../lib/types'
-  import type { ParallaxUser, ParallaxSession } from '../lib/api/parallax'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import { getAdminKey, getParallaxUrl } from '@lib/stores/auth.svelte'
+  import { listCarriers } from '@lib/api/skyscraper'
+  import { getParallaxCarriers, listUsers, listSessions, toggleUser, deleteUser } from '@lib/api/parallax'
+  import type { Carrier } from '@lib/types'
+  import type { ParallaxUser, ParallaxSession } from '@lib/api/parallax'
 
   let carriers = $state<Carrier[]>([])
   let users = $state<ParallaxUser[]>([])

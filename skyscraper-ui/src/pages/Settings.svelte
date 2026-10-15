@@ -1,18 +1,18 @@
 <script lang="ts">
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Input from '../components/ui/Input.svelte'
-  import Badge from '../components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Input from '@components/ui/Input.svelte'
+  import Badge from '@components/ui/Badge.svelte'
   import {
     getAdminKey, setAdminKey,
     getTenantApiKey, setTenantApiKey,
     getCosmiumUrl, setCosmiumUrl,
     getParallaxUrl, setParallaxUrl,
     getCosmiumApiKey, setCosmiumApiKey,
-  } from '../lib/stores/auth.svelte'
-  import { getHealth } from '../lib/api/skyscraper'
-  import { getCosmiumHealth } from '../lib/api/cosmium'
-  import { getParallaxCarriers } from '../lib/api/parallax'
+  } from '@lib/stores/auth.svelte'
+  import { getHealth } from '@lib/api/skyscraper'
+  import { getCosmiumHealth } from '@lib/api/cosmium'
+  import { getParallaxCarriers } from '@lib/api/parallax'
 
   let adminVal = $state(getAdminKey())
   let tenantVal = $state(getTenantApiKey())

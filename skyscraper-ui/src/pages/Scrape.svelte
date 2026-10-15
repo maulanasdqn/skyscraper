@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Button from '../components/ui/Button.svelte'
-  import Input from '../components/ui/Input.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Select from '../components/ui/Select.svelte'
-  import { getTenantApiKey } from '../lib/stores/auth.svelte'
-  import { submitJob, scrapeSync, submitBatch, type SubmitJobData } from '../lib/api/skyscraper'
-  import { formatMs } from '../lib/utils/format'
-  import type { Job, ScrapeResult } from '../lib/types'
+  import Button from '@components/ui/Button.svelte'
+  import Input from '@components/ui/Input.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Select from '@components/ui/Select.svelte'
+  import { getTenantApiKey } from '@lib/stores/auth.svelte'
+  import { submitJob, scrapeSync, submitBatch, type SubmitJobData } from '@lib/api/skyscraper'
+  import { formatMs } from '@lib/utils/format'
+  import type { Job, ScrapeResult } from '@lib/types'
 
   let url = $state('')
   let extractors = $state('')

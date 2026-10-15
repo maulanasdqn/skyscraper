@@ -1,14 +1,14 @@
 <script lang="ts">
-  import AppShell from './components/layout/AppShell.svelte'
-  import Dashboard from './pages/Dashboard.svelte'
-  import Jobs from './pages/Jobs.svelte'
-  import JobDetail from './pages/JobDetail.svelte'
-  import Scrape from './pages/Scrape.svelte'
-  import Tenants from './pages/Tenants.svelte'
-  import Carriers from './pages/Carriers.svelte'
-  import Profiles from './pages/Profiles.svelte'
-  import MetricsPage from './pages/MetricsPage.svelte'
-  import Settings from './pages/Settings.svelte'
+  import AppShell from '@components/layout/AppShell.svelte'
+  import Dashboard from '@pages/Dashboard.svelte'
+  import Jobs from '@pages/Jobs.svelte'
+  import JobDetail from '@pages/JobDetail.svelte'
+  import Scrape from '@pages/Scrape.svelte'
+  import Tenants from '@pages/Tenants.svelte'
+  import Carriers from '@pages/Carriers.svelte'
+  import Profiles from '@pages/Profiles.svelte'
+  import MetricsPage from '@pages/MetricsPage.svelte'
+  import Settings from '@pages/Settings.svelte'
 
   let currentRoute = $state('dashboard')
   let routeParam = $state('')

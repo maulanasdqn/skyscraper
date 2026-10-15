@@ -1,4 +1,4 @@
-import type { JobStatus, TenantPlan } from '../types'
+import type { JobStatus, TenantPlan } from '@lib/types'
 
 export function formatDate(iso: string | null): string {
   if (!iso) return '—'

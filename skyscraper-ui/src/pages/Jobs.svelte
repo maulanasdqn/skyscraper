@@ -1,16 +1,16 @@
 <script lang="ts">
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Select from '../components/ui/Select.svelte'
-  import { getTenantApiKey } from '../lib/stores/auth.svelte'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Select from '@components/ui/Select.svelte'
+  import { getTenantApiKey } from '@lib/stores/auth.svelte'
   import {
     getJobs, isLoading, getPage, getTotalPages, getTotal,
     getStatusFilter, setStatusFilter, setPage, fetchJobs,
-  } from '../lib/stores/jobs.svelte'
-  import { cancelJob, retryJob } from '../lib/api/skyscraper'
-  import { formatDate, formatMs, truncateUrl } from '../lib/utils/format'
-  import type { JobStatus } from '../lib/types'
+  } from '@lib/stores/jobs.svelte'
+  import { cancelJob, retryJob } from '@lib/api/skyscraper'
+  import { formatDate, formatMs, truncateUrl } from '@lib/utils/format'
+  import type { JobStatus } from '@lib/types'
 
   const statusOpts = [
     { value: '', label: 'All statuses' },

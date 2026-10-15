@@ -9,7 +9,7 @@ import type {
   Carrier,
   PaginatedResponse,
   UsageInfo,
-} from '../types'
+} from '@lib/types'
 
 // ── Health ──────────────────────────────────────────────
 

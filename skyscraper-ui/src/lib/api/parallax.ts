@@ -11,7 +11,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 const JSON_HEADERS: HeadersInit = { 'Content-Type': 'application/json' }
 
-// ── Carriers ────────────────────────────────────────────
+function api(baseUrl: string, path: string): string {
+  if (baseUrl.startsWith('http')) return `${baseUrl}/api${path}`
+  return `/parallax${path}`
+}
 
 export interface ParallaxCarrier {
   id: string
@@ -22,9 +25,7 @@ export interface ParallaxCarrier {
 }
 
 export const getParallaxCarriers = (baseUrl: string) =>
-  request<ParallaxCarrier[]>(`${baseUrl}/api/carriers`)
-
-// ── Users ───────────────────────────────────────────────
+  request<ParallaxCarrier[]>(api(baseUrl, '/carriers'))
 
 export interface ParallaxUser {
   id: string
@@ -35,31 +36,29 @@ export interface ParallaxUser {
 }
 
 export const listUsers = (baseUrl: string) =>
-  request<ParallaxUser[]>(`${baseUrl}/api/users`)
+  request<ParallaxUser[]>(api(baseUrl, '/users'))
 
 export const createUser = (baseUrl: string, data: Record<string, unknown>) =>
-  request<ParallaxUser>(`${baseUrl}/api/users`, {
+  request<ParallaxUser>(api(baseUrl, '/users'), {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify(data),
   })
 
 export const deleteUser = (baseUrl: string, id: string) =>
-  request<{ deleted: boolean }>(`${baseUrl}/api/users/${id}`, {
+  request<{ deleted: boolean }>(api(baseUrl, `/users/${id}`), {
     method: 'DELETE',
   })
 
 export const toggleUser = (baseUrl: string, id: string) =>
-  request<ParallaxUser>(`${baseUrl}/api/users/${id}/toggle`, {
+  request<ParallaxUser>(api(baseUrl, `/users/${id}/toggle`), {
     method: 'PATCH',
   })
 
 export const regenerateUserKey = (baseUrl: string, id: string) =>
-  request<{ api_key: string }>(`${baseUrl}/api/users/${id}/regenerate`, {
+  request<{ api_key: string }>(api(baseUrl, `/users/${id}/regenerate`), {
     method: 'POST',
   })
-
-// ── Sessions ────────────────────────────────────────────
 
 export interface ParallaxSession {
   id: string
@@ -72,4 +71,4 @@ export interface ParallaxSession {
 }
 
 export const listSessions = (baseUrl: string) =>
-  request<ParallaxSession[]>(`${baseUrl}/api/sessions`)
+  request<ParallaxSession[]>(api(baseUrl, '/sessions'))

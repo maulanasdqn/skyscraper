@@ -1,14 +1,14 @@
 <script lang="ts">
-  import StatCard from '../components/ui/StatCard.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import { getHealth } from '../lib/api/skyscraper'
-  import { getMetrics, getQueueStats, listAllJobs, flushCache } from '../lib/api/skyscraper'
-  import { getCosmiumHealth } from '../lib/api/cosmium'
-  import { getAdminKey, getCosmiumUrl, getCosmiumApiKey } from '../lib/stores/auth.svelte'
-  import { formatDate, formatMs, truncateUrl } from '../lib/utils/format'
-  import type { Job, Metrics, QueueStats } from '../lib/types'
+  import StatCard from '@components/ui/StatCard.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import { getHealth } from '@lib/api/skyscraper'
+  import { getMetrics, getQueueStats, listAllJobs, flushCache } from '@lib/api/skyscraper'
+  import { getCosmiumHealth } from '@lib/api/cosmium'
+  import { getAdminKey, getCosmiumUrl, getCosmiumApiKey } from '@lib/stores/auth.svelte'
+  import { formatDate, formatMs, truncateUrl } from '@lib/utils/format'
+  import type { Job, Metrics, QueueStats } from '@lib/types'
 
   let metrics = $state<Metrics | null>(null)
   let queue = $state<QueueStats | null>(null)

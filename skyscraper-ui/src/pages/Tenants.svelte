@@ -1,14 +1,14 @@
 <script lang="ts">
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import Input from '../components/ui/Input.svelte'
-  import Modal from '../components/ui/Modal.svelte'
-  import Select from '../components/ui/Select.svelte'
-  import { getAdminKey } from '../lib/stores/auth.svelte'
-  import { listTenants, createTenant, updateTenant, regenerateKey } from '../lib/api/skyscraper'
-  import { formatDate, planBadgeColor } from '../lib/utils/format'
-  import type { Tenant, TenantPlan } from '../lib/types'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import Input from '@components/ui/Input.svelte'
+  import Modal from '@components/ui/Modal.svelte'
+  import Select from '@components/ui/Select.svelte'
+  import { getAdminKey } from '@lib/stores/auth.svelte'
+  import { listTenants, createTenant, updateTenant, regenerateKey } from '@lib/api/skyscraper'
+  import { formatDate, planBadgeColor } from '@lib/utils/format'
+  import type { Tenant, TenantPlan } from '@lib/types'
 
   let tenants = $state<Tenant[]>([])
   let loading = $state(true)

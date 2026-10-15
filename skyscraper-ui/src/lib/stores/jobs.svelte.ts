@@ -1,5 +1,5 @@
-import type { Job, PaginatedResponse, JobStatus } from '../types'
-import { listJobs as fetchJobsApi, getJob as fetchJobApi } from '../api/skyscraper'
+import type { Job, PaginatedResponse, JobStatus } from '@lib/types'
+import { listJobs as fetchJobsApi, getJob as fetchJobApi } from '@lib/api/skyscraper'
 
 let jobs = $state<Job[]>([])
 let selectedJob = $state<Job | null>(null)

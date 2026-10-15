@@ -1,11 +1,11 @@
 <script lang="ts">
-  import Badge from '../components/ui/Badge.svelte'
-  import Button from '../components/ui/Button.svelte'
-  import Card from '../components/ui/Card.svelte'
-  import { getTenantApiKey } from '../lib/stores/auth.svelte'
-  import { getJob, cancelJob, retryJob, getScreenshotUrl } from '../lib/api/skyscraper'
-  import { formatDate, formatMs, formatBytes } from '../lib/utils/format'
-  import type { Job } from '../lib/types'
+  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/Button.svelte'
+  import Card from '@components/ui/Card.svelte'
+  import { getTenantApiKey } from '@lib/stores/auth.svelte'
+  import { getJob, cancelJob, retryJob, getScreenshotUrl } from '@lib/api/skyscraper'
+  import { formatDate, formatMs, formatBytes } from '@lib/utils/format'
+  import type { Job } from '@lib/types'
 
   let { jobId = '' }: { jobId?: string } = $props()
 

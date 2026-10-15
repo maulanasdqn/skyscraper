@@ -28,26 +28,31 @@ export interface ProfileSummary {
   platform?: string
 }
 
+function base(url: string): string {
+  if (url.startsWith('http')) return url
+  return ''
+}
+
 export const getCosmiumHealth = (baseUrl: string, apiKey?: string) =>
-  request<CosmiumHealth>(`${baseUrl}/api/health`, { headers: headers(apiKey) })
+  request<CosmiumHealth>(`${base(baseUrl)}/cosmium/health`, { headers: headers(apiKey) })
 
 export const listProfiles = (baseUrl: string, apiKey?: string) =>
-  request<{ profiles: string[] }>(`${baseUrl}/api/v1/profiles`, {
+  request<{ profiles: string[] }>(`${base(baseUrl)}/cosmium/v1/profiles`, {
     headers: headers(apiKey),
   })
 
 export const getProfileSummaries = (baseUrl: string, apiKey?: string) =>
-  request<ProfileSummary[]>(`${baseUrl}/api/v1/profiles/summaries`, {
+  request<ProfileSummary[]>(`${base(baseUrl)}/cosmium/v1/profiles/summaries`, {
     headers: headers(apiKey),
   })
 
 export const getProfile = (baseUrl: string, name: string, apiKey?: string) =>
-  request<Record<string, unknown>>(`${baseUrl}/api/v1/profiles/${encodeURIComponent(name)}`, {
+  request<Record<string, unknown>>(`${base(baseUrl)}/cosmium/v1/profiles/${encodeURIComponent(name)}`, {
     headers: headers(apiKey),
   })
 
 export const deleteProfile = (baseUrl: string, name: string, apiKey?: string) =>
-  request<{ deleted: boolean }>(`${baseUrl}/api/v1/profiles/${encodeURIComponent(name)}`, {
+  request<{ deleted: boolean }>(`${base(baseUrl)}/cosmium/v1/profiles/${encodeURIComponent(name)}`, {
     method: 'DELETE',
     headers: headers(apiKey),
   })
@@ -57,7 +62,7 @@ export const saveProfile = (
   data: { name: string; profile: unknown },
   apiKey?: string,
 ) =>
-  request<{ saved: boolean }>(`${baseUrl}/api/v1/profiles/save`, {
+  request<{ saved: boolean }>(`${base(baseUrl)}/cosmium/v1/profiles/save`, {
     method: 'POST',
     headers: headers(apiKey),
     body: JSON.stringify(data),
@@ -69,20 +74,20 @@ export const generateProfile = (
   name: string,
   apiKey?: string,
 ) =>
-  request<Record<string, unknown>>(`${baseUrl}/api/v1/profiles/generate`, {
+  request<Record<string, unknown>>(`${base(baseUrl)}/cosmium/v1/profiles/generate`, {
     method: 'POST',
     headers: headers(apiKey),
     body: JSON.stringify({ persona, name }),
   })
 
 export const runFingerprintTest = (baseUrl: string, apiKey?: string) =>
-  request<Record<string, unknown>>(`${baseUrl}/api/v1/tests/fingerprint`, {
+  request<Record<string, unknown>>(`${base(baseUrl)}/cosmium/v1/tests/fingerprint`, {
     method: 'POST',
     headers: headers(apiKey),
   })
 
 export const runStealthTest = (baseUrl: string, apiKey?: string) =>
-  request<Record<string, unknown>>(`${baseUrl}/api/v1/tests/stealth`, {
+  request<Record<string, unknown>>(`${base(baseUrl)}/cosmium/v1/tests/stealth`, {
     method: 'POST',
     headers: headers(apiKey),
   })
