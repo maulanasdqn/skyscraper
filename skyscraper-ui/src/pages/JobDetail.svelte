@@ -2,7 +2,7 @@
   import Badge from '@components/ui/Badge.svelte'
   import Button from '@components/ui/Button.svelte'
   import Card from '@components/ui/Card.svelte'
-  import { getTenantApiKey } from '@lib/stores/auth.svelte'
+  import { ensureTenant } from '@lib/stores/auth.svelte'
   import { getJob, cancelJob, retryJob, getScreenshotUrl } from '@lib/api/skyscraper'
   import { formatDate, formatMs, formatBytes } from '@lib/utils/format'
   import type { Job } from '@lib/types'
@@ -19,10 +19,10 @@
   }
 
   async function load() {
-    const key = getTenantApiKey()
-    if (!key || !jobId) { error = 'No API key or job ID'; loading = false; return }
+    if (!jobId) { error = 'No job ID'; loading = false; return }
     loading = true
     try {
+      const key = await ensureTenant()
       job = await getJob(key, jobId)
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load job'
@@ -31,12 +31,12 @@
   }
 
   async function handleCancel() {
-    const key = getTenantApiKey()
+    const key = await ensureTenant()
     if (key && job) { await cancelJob(key, job.id); load() }
   }
 
   async function handleRetry() {
-    const key = getTenantApiKey()
+    const key = await ensureTenant()
     if (key && job) { await retryJob(key, job.id); load() }
   }
 

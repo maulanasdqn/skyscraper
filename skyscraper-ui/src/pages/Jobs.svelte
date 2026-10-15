@@ -3,7 +3,7 @@
   import Button from '@components/ui/Button.svelte'
   import Card from '@components/ui/Card.svelte'
   import Select from '@components/ui/Select.svelte'
-  import { getTenantApiKey } from '@lib/stores/auth.svelte'
+  import { ensureTenant } from '@lib/stores/auth.svelte'
   import {
     getJobs, isLoading, getPage, getTotalPages, getTotal,
     getStatusFilter, setStatusFilter, setPage, fetchJobs,
@@ -28,8 +28,8 @@
 
   let filterVal = $state(getStatusFilter())
 
-  function load() {
-    const key = getTenantApiKey()
+  async function load() {
+    const key = await ensureTenant()
     if (key) fetchJobs(key)
   }
 
@@ -44,12 +44,12 @@
   }
 
   async function handleCancel(id: string) {
-    const key = getTenantApiKey()
+    const key = await ensureTenant()
     if (key) { await cancelJob(key, id); load() }
   }
 
   async function handleRetry(id: string) {
-    const key = getTenantApiKey()
+    const key = await ensureTenant()
     if (key) { await retryJob(key, id); load() }
   }
 

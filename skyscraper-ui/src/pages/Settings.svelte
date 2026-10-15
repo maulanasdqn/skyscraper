@@ -65,6 +65,8 @@
     if (s === 'testing') return { text: 'Testing...', color: 'yellow' }
     return { text: 'Not tested', color: 'gray' }
   }
+
+  $effect(() => { testSkyScraper(); testCosmium(); testParallax() })
 </script>
 
 <div class="max-w-2xl space-y-6">

@@ -3,7 +3,7 @@
   import Input from '@components/ui/Input.svelte'
   import Card from '@components/ui/Card.svelte'
   import Select from '@components/ui/Select.svelte'
-  import { getTenantApiKey } from '@lib/stores/auth.svelte'
+  import { ensureTenant } from '@lib/stores/auth.svelte'
   import { submitJob, scrapeSync, submitBatch, type SubmitJobData } from '@lib/api/skyscraper'
   import { formatMs } from '@lib/utils/format'
   import type { Job, ScrapeResult } from '@lib/types'
@@ -37,10 +37,10 @@
   }
 
   async function handleSubmit() {
-    const key = getTenantApiKey()
-    if (!key) { result = { error: 'Set tenant API key in Settings' }; return }
     submitting = true
     result = null
+    let key: string
+    try { key = await ensureTenant() } catch { result = { error: 'Failed to provision tenant' }; submitting = false; return }
     try {
       if (batchMode) {
         const urls = batchUrls.split('\n').map((s) => s.trim()).filter(Boolean)
