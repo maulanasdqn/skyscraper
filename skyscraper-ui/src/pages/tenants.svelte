@@ -1,13 +1,12 @@
 <script lang="ts">
-  import Badge from '@components/ui/Badge.svelte'
-  import Button from '@components/ui/Button.svelte'
-  import Card from '@components/ui/Card.svelte'
-  import Input from '@components/ui/Input.svelte'
-  import Modal from '@components/ui/Modal.svelte'
-  import Select from '@components/ui/Select.svelte'
+  import Badge from '@components/ui/badge.svelte'
+  import Button from '@components/ui/button.svelte'
+  import Input from '@components/ui/input.svelte'
+  import Modal from '@components/ui/modal.svelte'
+  import Select from '@components/ui/select.svelte'
   import { getAdminKey } from '@lib/stores/auth.svelte'
   import { listTenants, createTenant, updateTenant, regenerateKey } from '@lib/api/skyscraper'
-  import { formatDate, planBadgeColor } from '@lib/utils/format'
+  import { formatDate } from '@lib/utils/format'
   import type { Tenant, TenantPlan } from '@lib/types'
 
   let tenants = $state<Tenant[]>([])
@@ -24,16 +23,15 @@
     { value: 'free', label: 'Free' }, { value: 'starter', label: 'Starter' },
     { value: 'pro', label: 'Pro' }, { value: 'business', label: 'Business' },
   ]
-
-  const planColor: Record<string, 'gray' | 'blue' | 'purple' | 'yellow'> = {
-    free: 'gray', starter: 'blue', pro: 'purple', business: 'yellow',
+  const planColor: Record<string, 'gray' | 'blue' | 'purple' | 'orange'> = {
+    free: 'gray', starter: 'blue', pro: 'purple', business: 'orange',
   }
 
   async function load() {
     const key = getAdminKey()
     if (!key) { loading = false; return }
     loading = true
-    try { tenants = await listTenants(key) } catch { /* noop */ }
+    try { tenants = await listTenants(key) } catch {}
     loading = false
   }
 
@@ -56,8 +54,7 @@
       plan: editTenant.plan, rate_limit_rpm: editTenant.rate_limit_rpm,
       concurrent_limit: editTenant.concurrent_limit, webhook_url: editTenant.webhook_url,
     })
-    editTenant = null
-    load()
+    editTenant = null; load()
   }
 
   async function handleRegen(id: string) {
@@ -72,47 +69,43 @@
 </script>
 
 <div class="space-y-4">
-  <div class="flex justify-between items-center">
-    <span class="text-sm text-gray-500">{tenants.length} tenants</span>
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-text-primary">Tenants</h1>
     <Button size="sm" onclick={() => (showCreate = true)}>Create Tenant</Button>
   </div>
 
-  <Card>
+  <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
     {#if loading}
-      <p class="text-sm text-gray-500 animate-pulse">Loading...</p>
+      <div class="p-8 text-center text-sm text-text-muted">Loading...</div>
     {:else if tenants.length === 0}
-      <p class="text-sm text-gray-500">No tenants. Configure admin key in Settings.</p>
+      <div class="p-8 text-center text-sm text-text-muted">No tenants</div>
     {:else}
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-gray-500 text-xs uppercase tracking-wider">
-              <th class="pb-3">Email</th><th class="pb-3">Plan</th><th class="pb-3">RPM</th>
-              <th class="pb-3">Concurrent</th><th class="pb-3">Active</th>
-              <th class="pb-3">Created</th><th class="pb-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-800">
-            {#each tenants as t}
-              <tr class="hover:bg-gray-800/40">
-                <td class="py-2.5 text-gray-200">{t.email}</td>
-                <td class="py-2.5"><Badge text={t.plan} color={planColor[t.plan] ?? 'gray'} /></td>
-                <td class="py-2.5 text-gray-400">{t.rate_limit_rpm}</td>
-                <td class="py-2.5 text-gray-400">{t.concurrent_limit}</td>
-                <td class="py-2.5"><Badge text={t.active ? 'active' : 'inactive'}
-                  color={t.active ? 'green' : 'red'} /></td>
-                <td class="py-2.5 text-gray-500">{formatDate(t.created_at)}</td>
-                <td class="py-2.5 space-x-1">
-                  <Button size="sm" variant="ghost" onclick={() => (editTenant = { ...t })}>Edit</Button>
-                  <Button size="sm" variant="ghost" onclick={() => handleRegen(t.id)}>Regen Key</Button>
-                </td>
-              </tr>
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-border-subtle">
+            {#each ['Email', 'Plan', 'RPM', 'Active', 'Actions'] as h}
+              <th class="text-left text-[11px] text-text-muted uppercase tracking-wider px-4 py-2.5">{h}</th>
             {/each}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody>
+          {#each tenants as t}
+            <tr class="border-b border-border-subtle/50 hover:bg-surface-raised/50">
+              <td class="px-4 py-2.5 text-sm text-text-secondary">{t.email}</td>
+              <td class="px-4 py-2.5"><Badge text={t.plan} color={planColor[t.plan] ?? 'gray'} /></td>
+              <td class="px-4 py-2.5 text-sm text-text-muted tabular-nums">{t.rate_limit_rpm}</td>
+              <td class="px-4 py-2.5"><Badge text={t.active ? 'active' : 'inactive'}
+                color={t.active ? 'green' : 'red'} /></td>
+              <td class="px-4 py-2.5 space-x-2">
+                <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => (editTenant = { ...t })}>Edit</button>
+                <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => handleRegen(t.id)}>Regen</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     {/if}
-  </Card>
+  </div>
 </div>
 
 <Modal bind:open={showCreate} title="Create Tenant">
@@ -120,8 +113,8 @@
     <Input label="Email" bind:value={newEmail} placeholder="user@example.com" />
     <Select label="Plan" options={planOpts} bind:value={newPlan} />
     <div class="grid grid-cols-2 gap-3">
-      <Input label="Rate Limit (RPM)" type="number" bind:value={newRpm} />
-      <Input label="Concurrent Limit" type="number" bind:value={newConc} />
+      <Input label="RPM Limit" type="number" bind:value={newRpm} />
+      <Input label="Concurrent" type="number" bind:value={newConc} />
     </div>
     <div class="flex justify-end gap-2 pt-2">
       <Button variant="ghost" onclick={() => (showCreate = false)}>Cancel</Button>
@@ -134,12 +127,10 @@
   {#if editTenant}
     <div class="space-y-3">
       <Select label="Plan" options={planOpts} bind:value={editTenant.plan} />
-      <Input label="Rate Limit (RPM)" type="number" value={String(editTenant.rate_limit_rpm)}
+      <Input label="RPM Limit" type="number" value={String(editTenant.rate_limit_rpm)}
         oninput={(e: Event) => { if (editTenant) editTenant.rate_limit_rpm = parseInt((e.target as HTMLInputElement).value) }} />
-      <Input label="Concurrent Limit" type="number" value={String(editTenant.concurrent_limit)}
+      <Input label="Concurrent" type="number" value={String(editTenant.concurrent_limit)}
         oninput={(e: Event) => { if (editTenant) editTenant.concurrent_limit = parseInt((e.target as HTMLInputElement).value) }} />
-      <Input label="Webhook URL" value={editTenant.webhook_url ?? ''}
-        oninput={(e: Event) => { if (editTenant) editTenant.webhook_url = (e.target as HTMLInputElement).value || null }} />
       <div class="flex justify-end gap-2 pt-2">
         <Button variant="ghost" onclick={() => (editTenant = null)}>Cancel</Button>
         <Button onclick={handleUpdate}>Save</Button>

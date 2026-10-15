@@ -1,7 +1,6 @@
 <script lang="ts">
-  import StatCard from '@components/ui/StatCard.svelte'
-  import Button from '@components/ui/Button.svelte'
-  import Card from '@components/ui/Card.svelte'
+  import StatCard from '@components/ui/stat-card.svelte'
+  import Button from '@components/ui/button.svelte'
   import { getAdminKey } from '@lib/stores/auth.svelte'
   import { getMetrics, getQueueStats, getCacheStats, flushCache, retryDead } from '@lib/api/skyscraper'
   import type { Metrics, QueueStats, CacheStats } from '@lib/types'
@@ -34,97 +33,75 @@
 
   async function handleRetryDead() {
     const key = getAdminKey()
-    if (key) {
-      const r = await retryDead(key)
-      alert(`Retried ${r.retried} jobs`)
-      load()
-    }
+    if (key) { const r = await retryDead(key); alert(`Retried ${r.retried} jobs`); load() }
   }
 
-  function toggleAutoRefresh() {
+  function toggleAuto() {
     autoRefresh = !autoRefresh
-    if (autoRefresh) {
-      refreshTimer = setInterval(load, 5000)
-    } else if (refreshTimer) {
-      clearInterval(refreshTimer)
-      refreshTimer = null
-    }
+    if (autoRefresh) refreshTimer = setInterval(load, 5000)
+    else if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   $effect(() => { load() })
-  $effect(() => {
-    return () => { if (refreshTimer) clearInterval(refreshTimer) }
-  })
+  $effect(() => { return () => { if (refreshTimer) clearInterval(refreshTimer) } })
 
-  let cacheHitRate = $derived(
+  let hitRate = $derived(
     metrics && (metrics.cache_hits + metrics.cache_misses) > 0
       ? Math.round((metrics.cache_hits / (metrics.cache_hits + metrics.cache_misses)) * 100)
       : 0
   )
 </script>
 
-<div class="space-y-6">
+<div class="space-y-4">
   <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-text-primary">Metrics</h1>
     <div class="flex gap-2">
-      <Button size="sm" variant="ghost" onclick={load}>Refresh</Button>
-      <Button size="sm" variant={autoRefresh ? 'primary' : 'secondary'} onclick={toggleAutoRefresh}>
-        {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
-      </Button>
+      <button class="text-xs text-text-muted hover:text-text-secondary" onclick={load}>Refresh</button>
+      <button
+        class="text-xs px-2 py-1 rounded {autoRefresh ? 'bg-accent/10 text-accent' : 'text-text-muted hover:text-text-secondary'}"
+        onclick={toggleAuto}>{autoRefresh ? 'Auto ON' : 'Auto OFF'}</button>
     </div>
   </div>
 
-  {#if loading && !metrics}
-    <p class="text-sm text-gray-500 animate-pulse">Loading metrics...</p>
-  {:else}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard label="Jobs Processed" value={formatNumber(metrics?.jobs_processed ?? 0)} />
-      <StatCard label="Jobs Failed" value={formatNumber(metrics?.jobs_failed ?? 0)}
-        trend={metrics && metrics.jobs_failed > 0 ? 'down' : 'neutral'} />
-      <StatCard label="Jobs Timed Out" value={formatNumber(metrics?.jobs_timed_out ?? 0)} />
-      <StatCard label="Cache Hit Rate" value="{cacheHitRate}%"
-        subtitle="{metrics?.cache_hits ?? 0} hits / {metrics?.cache_misses ?? 0} misses" />
-    </div>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <StatCard label="Processed" value={formatNumber(metrics?.jobs_processed ?? 0)} />
+    <StatCard label="Failed" value={formatNumber(metrics?.jobs_failed ?? 0)}
+      trend={metrics && metrics.jobs_failed > 0 ? 'down' : 'neutral'} />
+    <StatCard label="Timed Out" value={formatNumber(metrics?.jobs_timed_out ?? 0)} />
+    <StatCard label="Cache Hit" value="{hitRate}%"
+      subtitle="{metrics?.cache_hits ?? 0} / {(metrics?.cache_hits ?? 0) + (metrics?.cache_misses ?? 0)}" />
+  </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard label="Webhooks Sent" value={formatNumber(metrics?.webhook_deliveries ?? 0)} />
-      <StatCard label="Webhook Failures" value={formatNumber(metrics?.webhook_failures ?? 0)} />
-      <StatCard label="Dedup Coalesced" value={formatNumber(metrics?.dedup_coalesced ?? 0)} />
-      <StatCard label="Domain Throttled" value={formatNumber(metrics?.domain_throttled ?? 0)} />
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Card title="Queue">
-        <div class="space-y-3">
-          {#each [
-            { label: 'Pending', val: queue?.pending, color: 'text-yellow-400' },
-            { label: 'Processing', val: queue?.processing, color: 'text-blue-400' },
-            { label: 'Scheduled', val: queue?.scheduled, color: 'text-indigo-400' },
-            { label: 'Dead Letter', val: queue?.dead, color: 'text-red-400' },
-          ] as item}
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-400">{item.label}</span>
-              <span class="text-sm font-medium {item.color}">{item.val ?? '—'}</span>
-            </div>
-          {/each}
-          {#if queue && (queue.dead ?? 0) > 0}
-            <Button size="sm" variant="secondary" onclick={handleRetryDead}>Retry Dead Jobs</Button>
-          {/if}
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div class="rounded-xl border border-border-subtle bg-surface p-4 space-y-3">
+      <h3 class="text-xs text-text-muted uppercase tracking-wider">Queue</h3>
+      {#each [
+        { label: 'Pending', val: queue?.pending, cls: 'text-warning' },
+        { label: 'Processing', val: queue?.processing, cls: 'text-info' },
+        { label: 'Scheduled', val: queue?.scheduled, cls: 'text-text-secondary' },
+        { label: 'Dead', val: queue?.dead, cls: 'text-danger' },
+      ] as item}
+        <div class="flex justify-between text-sm">
+          <span class="text-text-muted">{item.label}</span>
+          <span class="{item.cls} tabular-nums">{item.val ?? '—'}</span>
         </div>
-      </Card>
-
-      <Card title="Cache">
-        <div class="space-y-3">
-          <div class="flex justify-between">
-            <span class="text-sm text-gray-400">Cached URLs</span>
-            <span class="text-sm text-gray-200">{cache?.cached_urls ?? '—'}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-sm text-gray-400">TTL</span>
-            <span class="text-sm text-gray-200">{cache?.ttl_secs ?? '—'}s</span>
-          </div>
-          <Button size="sm" variant="danger" onclick={handleFlush}>Flush Cache</Button>
-        </div>
-      </Card>
+      {/each}
+      {#if queue && (queue.dead ?? 0) > 0}
+        <Button size="sm" variant="secondary" onclick={handleRetryDead}>Retry Dead</Button>
+      {/if}
     </div>
-  {/if}
+
+    <div class="rounded-xl border border-border-subtle bg-surface p-4 space-y-3">
+      <h3 class="text-xs text-text-muted uppercase tracking-wider">Cache</h3>
+      <div class="flex justify-between text-sm">
+        <span class="text-text-muted">Cached URLs</span>
+        <span class="text-text-secondary tabular-nums">{cache?.cached_urls ?? '—'}</span>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span class="text-text-muted">TTL</span>
+        <span class="text-text-secondary">{cache?.ttl_secs ?? '—'}s</span>
+      </div>
+      <Button size="sm" variant="danger" onclick={handleFlush}>Flush Cache</Button>
+    </div>
+  </div>
 </div>

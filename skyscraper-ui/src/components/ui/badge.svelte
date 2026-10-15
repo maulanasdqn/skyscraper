@@ -3,20 +3,21 @@
     color = 'gray',
     text = '',
   }: {
-    color?: 'green' | 'yellow' | 'red' | 'blue' | 'gray' | 'purple'
+    color?: 'green' | 'yellow' | 'red' | 'blue' | 'gray' | 'purple' | 'orange'
     text: string
   } = $props()
 
   const colors: Record<string, string> = {
-    green: 'bg-green-900/50 text-green-400 ring-green-500/30',
-    yellow: 'bg-yellow-900/50 text-yellow-400 ring-yellow-500/30',
-    red: 'bg-red-900/50 text-red-400 ring-red-500/30',
-    blue: 'bg-blue-900/50 text-blue-400 ring-blue-500/30',
-    gray: 'bg-gray-800 text-gray-400 ring-gray-600/30',
-    purple: 'bg-purple-900/50 text-purple-400 ring-purple-500/30',
+    green: 'bg-success/10 text-success',
+    yellow: 'bg-warning/10 text-warning',
+    red: 'bg-danger/10 text-danger',
+    blue: 'bg-info/10 text-info',
+    gray: 'bg-surface-overlay text-text-muted',
+    purple: 'bg-accent/10 text-accent',
+    orange: 'bg-orange-500/10 text-orange-400',
   }
 </script>
 
-<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset {colors[color]}">
+<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium {colors[color]}">
   {text}
 </span>

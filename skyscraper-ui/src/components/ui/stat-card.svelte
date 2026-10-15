@@ -3,35 +3,34 @@
     label = '',
     value = '',
     subtitle = '',
+    icon = '',
     trend = 'neutral',
   }: {
     label: string
     value: string | number
     subtitle?: string
+    icon?: string
     trend?: 'up' | 'down' | 'neutral'
   } = $props()
 
   const trendColors: Record<string, string> = {
-    up: 'text-green-400',
-    down: 'text-red-400',
-    neutral: 'text-gray-500',
-  }
-
-  const trendIcons: Record<string, string> = {
-    up: '↑',
-    down: '↓',
-    neutral: '—',
+    up: 'text-success',
+    down: 'text-danger',
+    neutral: 'text-text-muted',
   }
 </script>
 
-<div class="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-  <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-  <div class="mt-2 flex items-baseline gap-2">
-    <p class="text-2xl font-bold text-gray-100">{value}</p>
-    {#if subtitle}
-      <span class="text-xs {trendColors[trend]}">
-        {trendIcons[trend]} {subtitle}
-      </span>
-    {/if}
-  </div>
+<div class="rounded-xl border border-border-subtle bg-surface p-5">
+  {#if icon}
+    <div class="w-9 h-9 rounded-lg bg-accent-soft border border-border-subtle flex items-center justify-center mb-3">
+      <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d={icon} />
+      </svg>
+    </div>
+  {/if}
+  <p class="text-xs text-text-muted mb-1.5">{label}</p>
+  <p class="text-2xl font-bold text-text-primary tabular-nums tracking-tight">{value}</p>
+  {#if subtitle}
+    <p class="text-[11px] mt-1 {trendColors[trend]}">{subtitle}</p>
+  {/if}
 </div>

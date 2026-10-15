@@ -1,8 +1,6 @@
 <script lang="ts">
-  import Badge from '@components/ui/Badge.svelte'
-  import Button from '@components/ui/Button.svelte'
-  import Card from '@components/ui/Card.svelte'
-  import Select from '@components/ui/Select.svelte'
+  import Badge from '@components/ui/badge.svelte'
+  import Button from '@components/ui/button.svelte'
   import { ensureTenant } from '@lib/stores/auth.svelte'
   import {
     getJobs, isLoading, getPage, getTotalPages, getTotal,
@@ -12,16 +10,7 @@
   import { formatDate, formatMs, truncateUrl } from '@lib/utils/format'
   import type { JobStatus } from '@lib/types'
 
-  const statusOpts = [
-    { value: '', label: 'All statuses' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'running', label: 'Running' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'failed', label: 'Failed' },
-    { value: 'dead', label: 'Dead' },
-  ]
-
-  const statusBadge: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
+  const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow',
     failed: 'red', dead: 'gray', scheduled: 'blue',
   }
@@ -33,15 +22,13 @@
     if (key) fetchJobs(key)
   }
 
-  function onFilterChange() {
-    setStatusFilter(filterVal as JobStatus | '')
+  function onFilterChange(val: string) {
+    filterVal = val
+    setStatusFilter(val as JobStatus | '')
     load()
   }
 
-  function goPage(p: number) {
-    setPage(p)
-    load()
-  }
+  function goPage(p: number) { setPage(p); load() }
 
   async function handleCancel(id: string) {
     const key = await ensureTenant()
@@ -53,80 +40,83 @@
     if (key) { await retryJob(key, id); load() }
   }
 
-  function navigate(route: string) { window.location.hash = route }
-
   $effect(() => { load() })
 </script>
 
-<div class="space-y-4">
+<div class="space-y-5">
   <div class="flex items-center justify-between">
-    <div class="w-48">
-      <Select options={statusOpts} bind:value={filterVal} />
-    </div>
+    <h1 class="text-xl font-bold text-text-primary">Jobs</h1>
     <div class="flex items-center gap-3">
-      <span class="text-sm text-gray-500">{getTotal()} jobs</span>
-      <Button size="sm" variant="ghost" onclick={load}>Refresh</Button>
-      <Button size="sm" onclick={() => navigate('scrape')}>New Scrape</Button>
+      <select
+        value={filterVal}
+        onchange={(e) => onFilterChange((e.target as HTMLSelectElement).value)}
+        class="rounded-xl border border-border-subtle bg-surface-raised px-3 py-1.5 text-xs
+          text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent/40"
+      >
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="running">Running</option>
+        <option value="completed">Completed</option>
+        <option value="failed">Failed</option>
+      </select>
+      <span class="text-xs text-text-muted tabular-nums">{getTotal()} total</span>
     </div>
   </div>
 
-  {#if filterVal !== getStatusFilter()}
-    <Button size="sm" variant="secondary" onclick={onFilterChange}>Apply Filter</Button>
-  {/if}
-
-  <Card>
+  <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
     {#if isLoading()}
-      <p class="text-sm text-gray-500 animate-pulse">Loading jobs...</p>
+      <div class="p-12 text-center">
+        <svg class="animate-spin h-5 w-5 mx-auto text-accent" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
     {:else if getJobs().length === 0}
-      <p class="text-sm text-gray-500">No jobs found</p>
+      <div class="p-12 text-center text-sm text-text-muted">No jobs found</div>
     {:else}
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-gray-500 text-xs uppercase tracking-wider">
-              <th class="pb-3 pr-4">ID</th><th class="pb-3 pr-4">URL</th>
-              <th class="pb-3 pr-4">Status</th><th class="pb-3 pr-4">Priority</th>
-              <th class="pb-3 pr-4">Duration</th><th class="pb-3 pr-4">Created</th>
-              <th class="pb-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-800">
-            {#each getJobs() as job}
-              <tr class="hover:bg-gray-800/40 transition-colors">
-                <td class="py-2.5 pr-4">
-                  <button class="text-indigo-400 hover:underline font-mono text-xs"
-                    onclick={() => navigate(`jobs/${job.id}`)}>
-                    {job.id.slice(0, 8)}
-                  </button>
-                </td>
-                <td class="py-2.5 pr-4 text-gray-300 max-w-xs truncate">{truncateUrl(job.request.url, 45)}</td>
-                <td class="py-2.5 pr-4"><Badge text={job.status} color={statusBadge[job.status] ?? 'gray'} /></td>
-                <td class="py-2.5 pr-4 text-gray-400">{job.priority}</td>
-                <td class="py-2.5 pr-4 text-gray-400">{formatMs(job.result?.elapsed_ms)}</td>
-                <td class="py-2.5 pr-4 text-gray-500">{formatDate(job.created_at)}</td>
-                <td class="py-2.5 space-x-1">
-                  {#if job.status === 'pending'}
-                    <Button size="sm" variant="danger" onclick={() => handleCancel(job.id)}>Cancel</Button>
-                  {/if}
-                  {#if job.status === 'failed' || job.status === 'dead'}
-                    <Button size="sm" variant="secondary" onclick={() => handleRetry(job.id)}>Retry</Button>
-                  {/if}
-                </td>
-              </tr>
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-border-subtle">
+            {#each ['URL', 'Status', 'Time', 'Created', ''] as h}
+              <th class="text-left text-[11px] text-text-muted uppercase tracking-wider px-5 py-3">{h}</th>
             {/each}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody>
+          {#each getJobs() as job}
+            <tr class="border-b border-border-subtle/40 hover:bg-surface-raised/40 transition-colors">
+              <td class="px-5 py-3">
+                <a href="#{`jobs/${job.id}`}" class="text-sm text-text-secondary hover:text-accent transition-colors">
+                  {truncateUrl(job.request.url, 45)}
+                </a>
+              </td>
+              <td class="px-5 py-3"><Badge text={job.status} color={statusColor[job.status] ?? 'gray'} /></td>
+              <td class="px-5 py-3 text-sm text-text-muted tabular-nums">{formatMs(job.result?.elapsed_ms)}</td>
+              <td class="px-5 py-3 text-sm text-text-muted">{formatDate(job.created_at)}</td>
+              <td class="px-5 py-3">
+                {#if job.status === 'pending'}
+                  <button class="text-xs text-danger hover:underline" onclick={() => handleCancel(job.id)}>Cancel</button>
+                {/if}
+                {#if job.status === 'failed' || job.status === 'dead'}
+                  <button class="text-xs text-accent hover:underline" onclick={() => handleRetry(job.id)}>Retry</button>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
 
-      <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
-        <span class="text-xs text-gray-500">Page {getPage()} of {getTotalPages()}</span>
-        <div class="flex gap-2">
-          <Button size="sm" variant="ghost" disabled={getPage() <= 1}
-            onclick={() => goPage(getPage() - 1)}>Prev</Button>
-          <Button size="sm" variant="ghost" disabled={getPage() >= getTotalPages()}
-            onclick={() => goPage(getPage() + 1)}>Next</Button>
+      {#if getTotalPages() > 1}
+        <div class="flex items-center justify-between px-5 py-3 border-t border-border-subtle">
+          <span class="text-xs text-text-muted">{getPage()} / {getTotalPages()}</span>
+          <div class="flex gap-1">
+            <Button size="sm" variant="ghost" disabled={getPage() <= 1}
+              onclick={() => goPage(getPage() - 1)}>Prev</Button>
+            <Button size="sm" variant="ghost" disabled={getPage() >= getTotalPages()}
+              onclick={() => goPage(getPage() + 1)}>Next</Button>
+          </div>
         </div>
-      </div>
+      {/if}
     {/if}
-  </Card>
+  </div>
 </div>

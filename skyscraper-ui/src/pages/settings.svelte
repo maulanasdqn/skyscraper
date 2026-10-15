@@ -1,8 +1,7 @@
 <script lang="ts">
-  import Button from '@components/ui/Button.svelte'
-  import Card from '@components/ui/Card.svelte'
-  import Input from '@components/ui/Input.svelte'
-  import Badge from '@components/ui/Badge.svelte'
+  import Button from '@components/ui/button.svelte'
+  import Input from '@components/ui/input.svelte'
+  import Badge from '@components/ui/badge.svelte'
   import {
     getAdminKey, setAdminKey,
     getTenantApiKey, setTenantApiKey,
@@ -26,102 +25,63 @@
   let saved = $state(false)
 
   function handleSave() {
-    setAdminKey(adminVal)
-    setTenantApiKey(tenantVal)
-    setCosmiumUrl(cosmiumVal)
-    setParallaxUrl(parallaxVal)
-    setCosmiumApiKey(cosmiumKeyVal)
-    saved = true
-    setTimeout(() => (saved = false), 2000)
+    setAdminKey(adminVal); setTenantApiKey(tenantVal)
+    setCosmiumUrl(cosmiumVal); setParallaxUrl(parallaxVal); setCosmiumApiKey(cosmiumKeyVal)
+    saved = true; setTimeout(() => (saved = false), 2000)
   }
 
-  function handleClear() {
-    adminVal = ''; tenantVal = ''; cosmiumVal = 'http://localhost:3000'
-    parallaxVal = 'http://localhost:3001'; cosmiumKeyVal = ''
-    handleSave()
-  }
-
-  async function testSkyScraper() {
-    skyStatus = 'testing'
-    try { await getHealth(); skyStatus = 'ok' }
-    catch { skyStatus = 'fail' }
-  }
-
-  async function testCosmium() {
-    cosStatus = 'testing'
-    try { await getCosmiumHealth(cosmiumVal, cosmiumKeyVal); cosStatus = 'ok' }
-    catch { cosStatus = 'fail' }
-  }
-
-  async function testParallax() {
-    plxStatus = 'testing'
-    try { await getParallaxCarriers(parallaxVal); plxStatus = 'ok' }
-    catch { plxStatus = 'fail' }
-  }
+  async function testSky() { skyStatus = 'testing'; try { await getHealth(); skyStatus = 'ok' } catch { skyStatus = 'fail' } }
+  async function testCos() { cosStatus = 'testing'; try { await getCosmiumHealth(cosmiumVal, cosmiumKeyVal); cosStatus = 'ok' } catch { cosStatus = 'fail' } }
+  async function testPlx() { plxStatus = 'testing'; try { await getParallaxCarriers(parallaxVal); plxStatus = 'ok' } catch { plxStatus = 'fail' } }
 
   function statusBadge(s: string): { text: string; color: 'green' | 'red' | 'yellow' | 'gray' } {
     if (s === 'ok') return { text: 'Connected', color: 'green' }
     if (s === 'fail') return { text: 'Failed', color: 'red' }
-    if (s === 'testing') return { text: 'Testing...', color: 'yellow' }
-    return { text: 'Not tested', color: 'gray' }
+    if (s === 'testing') return { text: 'Testing', color: 'yellow' }
+    return { text: '—', color: 'gray' }
   }
 
-  $effect(() => { testSkyScraper(); testCosmium(); testParallax() })
+  $effect(() => { testSky(); testCos(); testPlx() })
 </script>
 
-<div class="max-w-2xl space-y-6">
-  <Card title="API Keys">
-    <div class="space-y-4">
-      <Input label="Admin API Key" type="password" bind:value={adminVal}
-        placeholder="sk_admin_..." />
-      <Input label="Tenant API Key" type="password" bind:value={tenantVal}
-        placeholder="sk_..." />
-      <p class="text-xs text-gray-500">
-        Admin key manages tenants and system. Tenant key submits scrape jobs.
-      </p>
-    </div>
-  </Card>
+<div class="space-y-6 max-w-xl">
+  <h1 class="text-xl font-bold text-text-primary">Settings</h1>
 
-  <Card title="Service Connections">
-    <div class="space-y-4">
+  <div class="rounded-xl border border-border-subtle bg-surface divide-y divide-border-subtle">
+    <div class="p-4 space-y-3">
+      <h3 class="text-xs text-text-muted uppercase tracking-wider">API Keys</h3>
+      <Input label="Admin Key" type="password" bind:value={adminVal} placeholder="sk_admin_..." />
+      <Input label="Tenant Key" type="password" bind:value={tenantVal} placeholder="sk_..." />
+    </div>
+
+    <div class="p-4 space-y-4">
+      <h3 class="text-xs text-text-muted uppercase tracking-wider">Services</h3>
+
       <div class="flex items-end gap-3">
-        <div class="flex-1">
-          <p class="text-xs text-gray-500 mb-2">SkyScraper API (this server)</p>
-        </div>
-        <Button size="sm" variant="secondary" onclick={testSkyScraper}
-          loading={skyStatus === 'testing'}>Test</Button>
+        <div class="flex-1"><span class="text-sm text-text-secondary">SkyScraper API</span></div>
+        <button class="text-xs text-text-muted hover:text-text-secondary" onclick={testSky}>Test</button>
         <Badge {...statusBadge(skyStatus)} />
       </div>
 
-      <div class="border-t border-gray-800 pt-4">
+      <div class="space-y-2">
         <div class="flex items-end gap-3">
-          <div class="flex-1"><Input label="Cosmium URL" bind:value={cosmiumVal} placeholder="http://localhost:3000" /></div>
-          <Button size="sm" variant="secondary" onclick={testCosmium}
-            loading={cosStatus === 'testing'}>Test</Button>
-          <Badge {...statusBadge(cosStatus)} />
+          <div class="flex-1"><Input label="Cosmium" bind:value={cosmiumVal} placeholder="http://localhost:3000" /></div>
+          <button class="text-xs text-text-muted hover:text-text-secondary mb-1" onclick={testCos}>Test</button>
+          <div class="mb-1"><Badge {...statusBadge(cosStatus)} /></div>
         </div>
-        <div class="mt-3">
-          <Input label="Cosmium API Key" type="password" bind:value={cosmiumKeyVal}
-            placeholder="Optional" />
-        </div>
+        <Input label="Cosmium API Key" type="password" bind:value={cosmiumKeyVal} placeholder="Optional" />
       </div>
 
-      <div class="border-t border-gray-800 pt-4">
-        <div class="flex items-end gap-3">
-          <div class="flex-1"><Input label="Parallax URL" bind:value={parallaxVal} placeholder="http://localhost:3001" /></div>
-          <Button size="sm" variant="secondary" onclick={testParallax}
-            loading={plxStatus === 'testing'}>Test</Button>
-          <Badge {...statusBadge(plxStatus)} />
-        </div>
+      <div class="flex items-end gap-3">
+        <div class="flex-1"><Input label="Parallax" bind:value={parallaxVal} placeholder="http://localhost:3001" /></div>
+        <button class="text-xs text-text-muted hover:text-text-secondary mb-1" onclick={testPlx}>Test</button>
+        <div class="mb-1"><Badge {...statusBadge(plxStatus)} /></div>
       </div>
     </div>
-  </Card>
+  </div>
 
   <div class="flex items-center gap-3">
-    <Button onclick={handleSave}>Save Settings</Button>
-    <Button variant="danger" onclick={handleClear}>Reset to Defaults</Button>
-    {#if saved}
-      <span class="text-sm text-green-400">Saved</span>
-    {/if}
+    <Button onclick={handleSave}>Save</Button>
+    {#if saved}<span class="text-xs text-success">Saved</span>{/if}
   </div>
 </div>

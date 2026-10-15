@@ -19,19 +19,20 @@
 <div class="flex flex-col gap-1.5">
   {#if label}
     <!-- svelte-ignore a11y_label_has_associated_control -->
-    <label class="text-sm font-medium text-gray-300">{label}</label>
+    <label class="text-xs font-medium text-text-muted">{label}</label>
   {/if}
   <input
     {type}
     {placeholder}
     {disabled}
     bind:value
-    class="w-full rounded-lg border bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500
-      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-      disabled:opacity-50 disabled:cursor-not-allowed
-      {error ? 'border-red-500' : 'border-gray-700'}"
+    class="w-full rounded-xl border bg-surface-raised px-3.5 py-2 text-sm text-text-primary
+      placeholder-text-muted transition-colors
+      focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent/40
+      disabled:opacity-40 disabled:cursor-not-allowed
+      {error ? 'border-danger/50' : 'border-border-subtle'}"
   />
   {#if error}
-    <p class="text-xs text-red-400">{error}</p>
+    <p class="text-xs text-danger">{error}</p>
   {/if}
 </div>

@@ -12,12 +12,14 @@
 
 <div class="flex flex-col gap-1.5">
   {#if label}
-    <label class="text-sm font-medium text-gray-300">{label}</label>
+    <!-- svelte-ignore a11y_label_has_associated_control -->
+    <label class="text-xs font-medium text-text-muted">{label}</label>
   {/if}
   <select
     bind:value
-    class="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100
-      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+    class="w-full rounded-xl border border-border-subtle bg-surface-raised px-3.5 py-2 text-sm
+      text-text-primary transition-colors
+      focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent/40
       appearance-none cursor-pointer"
   >
     {#each options as opt}

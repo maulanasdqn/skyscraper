@@ -3,15 +3,17 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 
+const root = import.meta.dirname
+
 export default defineConfig({
   plugins: [tailwindcss(), svelte()],
 
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@lib': resolve(__dirname, 'src/lib'),
-      '@components': resolve(__dirname, 'src/components'),
-      '@pages': resolve(__dirname, 'src/pages'),
+      '@': resolve(root, 'src'),
+      '@lib': resolve(root, 'src/lib'),
+      '@components': resolve(root, 'src/components'),
+      '@pages': resolve(root, 'src/pages'),
     },
   },
 

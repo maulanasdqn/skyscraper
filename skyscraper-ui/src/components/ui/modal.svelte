@@ -11,10 +11,6 @@
     children?: Snippet
   } = $props()
 
-  function onBackdropClick() {
-    open = false
-  }
-
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') open = false
   }
@@ -25,28 +21,25 @@
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center">
     <div
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm"
-      role="button"
-      tabindex="-1"
-      onclick={onBackdropClick}
-      onkeydown={onKeydown}
+      class="fixed inset-0 bg-black/70 backdrop-blur-sm"
+      role="button" tabindex="-1"
+      onclick={() => (open = false)} onkeydown={onKeydown}
     ></div>
 
-    <div class="relative z-10 w-full max-w-lg mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-        <h3 class="text-lg font-semibold text-gray-100">{title}</h3>
+    <div class="relative z-10 w-full max-w-md mx-4 bg-surface border border-border-subtle rounded-2xl shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+        <h3 class="text-sm font-semibold text-text-primary">{title}</h3>
         <button
           aria-label="Close"
           onclick={() => (open = false)}
-          class="text-gray-400 hover:text-gray-200 transition-colors"
+          class="text-text-muted hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-surface-raised"
         >
-          <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
           </svg>
         </button>
       </div>
-
-      <div class="px-6 py-4">
+      <div class="p-5">
         {#if children}{@render children()}{/if}
       </div>
     </div>

@@ -1,10 +1,9 @@
 <script lang="ts">
-  import StatCard from '@components/ui/StatCard.svelte'
-  import Card from '@components/ui/Card.svelte'
-  import Badge from '@components/ui/Badge.svelte'
-  import Button from '@components/ui/Button.svelte'
+  import StatCard from '@components/ui/stat-card.svelte'
+  import Card from '@components/ui/card.svelte'
+  import Badge from '@components/ui/badge.svelte'
   import { getHealth } from '@lib/api/skyscraper'
-  import { getMetrics, getQueueStats, listAllJobs, flushCache } from '@lib/api/skyscraper'
+  import { getMetrics, getQueueStats, listAllJobs } from '@lib/api/skyscraper'
   import { getCosmiumHealth } from '@lib/api/cosmium'
   import { getAdminKey, getCosmiumUrl, getCosmiumApiKey } from '@lib/stores/auth.svelte'
   import { formatDate, formatMs, truncateUrl } from '@lib/utils/format'
@@ -15,117 +14,122 @@
   let recentJobs = $state<Job[]>([])
   let skyHealth = $state<string>('...')
   let cosHealth = $state<string>('...')
-  let loading = $state(true)
 
-  const statusBadge: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
+  const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow',
     failed: 'red', dead: 'gray', scheduled: 'blue',
   }
 
-  async function load() {
-    loading = true
-    const key = getAdminKey()
-    try {
-      const [m, q, jobs, h] = await Promise.allSettled([
-        key ? getMetrics(key) : Promise.reject('no key'),
-        key ? getQueueStats(key) : Promise.reject('no key'),
-        key ? listAllJobs(key, { per_page: 8 }) : Promise.reject('no key'),
-        getHealth(),
-      ])
-      if (m.status === 'fulfilled') metrics = m.value
-      if (q.status === 'fulfilled') queue = q.value
-      if (jobs.status === 'fulfilled') recentJobs = jobs.value.data
-      skyHealth = h.status === 'fulfilled' ? 'online' : 'offline'
-    } catch { skyHealth = 'error' }
+  const icons = {
+    processed: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    pending: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    cache: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4',
+    failed: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z',
+  }
 
+  async function load() {
+    const key = getAdminKey()
+    const [m, q, jobs, h] = await Promise.allSettled([
+      key ? getMetrics(key) : Promise.reject(),
+      key ? getQueueStats(key) : Promise.reject(),
+      key ? listAllJobs(key, { per_page: 6 }) : Promise.reject(),
+      getHealth(),
+    ])
+    if (m.status === 'fulfilled') metrics = m.value
+    if (q.status === 'fulfilled') queue = q.value
+    if (jobs.status === 'fulfilled') recentJobs = jobs.value.data
+    skyHealth = h.status === 'fulfilled' ? 'online' : 'offline'
     try {
       await getCosmiumHealth(getCosmiumUrl(), getCosmiumApiKey())
       cosHealth = 'online'
     } catch { cosHealth = 'offline' }
-    loading = false
-  }
-
-  async function handleFlush() {
-    const key = getAdminKey()
-    if (key) { await flushCache(key); load() }
   }
 
   $effect(() => { load() })
-
-  function navigate(route: string) { window.location.hash = route }
 </script>
 
 <div class="space-y-6">
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard label="Jobs Processed" value={metrics?.jobs_processed ?? '—'} />
-    <StatCard label="Queue Pending" value={queue?.pending ?? '—'} />
-    <StatCard label="Cache Hits" value={metrics?.cache_hits ?? '—'}
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-text-primary">Dashboard</h1>
+    <button class="text-xs text-text-muted hover:text-text-secondary transition-colors" onclick={load}>Refresh</button>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatCard label="Jobs Processed" value={metrics?.jobs_processed ?? '—'} icon={icons.processed} />
+    <StatCard label="Queue Pending" value={queue?.pending ?? '—'} icon={icons.pending} />
+    <StatCard label="Cache Hits" value={metrics?.cache_hits ?? '—'} icon={icons.cache}
       subtitle={metrics ? `${metrics.cache_misses} misses` : ''} />
-    <StatCard label="Failed" value={metrics?.jobs_failed ?? '—'}
+    <StatCard label="Failed" value={metrics?.jobs_failed ?? '—'} icon={icons.failed}
       trend={metrics && metrics.jobs_failed > 0 ? 'down' : 'neutral'} />
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <Card title="Service Health">
+    <Card title="Services">
       <div class="space-y-3">
         {#each [
           { name: 'SkyScraper API', status: skyHealth },
           { name: 'Cosmium Browser', status: cosHealth },
         ] as svc}
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-300">{svc.name}</span>
-            <Badge text={svc.status}
-              color={svc.status === 'online' ? 'green' : svc.status === 'offline' ? 'red' : 'gray'} />
+            <span class="text-sm text-text-secondary">{svc.name}</span>
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full {svc.status === 'online' ? 'bg-success' : 'bg-danger'}"></span>
+              <span class="text-xs text-text-muted">{svc.status}</span>
+            </div>
           </div>
         {/each}
       </div>
     </Card>
 
     <Card title="Queue">
-      <div class="space-y-2 text-sm">
+      <div class="space-y-2.5 text-sm">
         {#each [
-          ['Pending', queue?.pending],
-          ['Processing', queue?.processing],
-          ['Scheduled', queue?.scheduled],
-          ['Dead Letter', queue?.dead],
-        ] as [label, val]}
+          ['Pending', queue?.pending, 'text-warning'],
+          ['Processing', queue?.processing, 'text-info'],
+          ['Scheduled', queue?.scheduled, 'text-text-secondary'],
+          ['Dead Letter', queue?.dead, 'text-danger'],
+        ] as [label, val, cls]}
           <div class="flex justify-between">
-            <span class="text-gray-400">{label}</span>
-            <span class="text-gray-200 font-medium">{val ?? '—'}</span>
+            <span class="text-text-muted">{label}</span>
+            <span class="{cls} tabular-nums font-medium">{val ?? '—'}</span>
           </div>
         {/each}
       </div>
     </Card>
 
     <Card title="Quick Actions">
-      <div class="space-y-3">
-        <Button variant="primary" size="sm" onclick={() => navigate('scrape')}>New Scrape</Button>
-        <Button variant="secondary" size="sm" onclick={handleFlush}>Flush Cache</Button>
-        <Button variant="ghost" size="sm" onclick={() => load()}>Refresh</Button>
+      <div class="space-y-2.5">
+        <a href="#playground" class="flex items-center gap-2 text-sm text-accent hover:text-accent-hover transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          New Scrape
+        </a>
+        <a href="#jobs" class="block text-sm text-text-secondary hover:text-text-primary transition-colors">View Jobs</a>
+        <a href="#metrics" class="block text-sm text-text-secondary hover:text-text-primary transition-colors">Metrics</a>
       </div>
     </Card>
   </div>
 
   <Card title="Recent Jobs">
     {#if recentJobs.length === 0}
-      <p class="text-sm text-gray-500">No jobs yet</p>
+      <p class="text-sm text-text-muted">No jobs yet. Start scraping from the Playground.</p>
     {:else}
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="overflow-x-auto -mx-5 -mb-5">
+        <table class="w-full">
           <thead>
-            <tr class="text-left text-gray-500 text-xs uppercase">
-              <th class="pb-2">URL</th><th class="pb-2">Status</th>
-              <th class="pb-2">Duration</th><th class="pb-2">Created</th>
+            <tr class="border-b border-border-subtle">
+              {#each ['URL', 'Status', 'Duration', 'Created'] as h}
+                <th class="text-left text-[11px] text-text-muted uppercase tracking-wider px-5 pb-3">{h}</th>
+              {/each}
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-800">
+          <tbody>
             {#each recentJobs as job}
-              <tr class="hover:bg-gray-800/50 cursor-pointer"
-                  onclick={() => navigate(`jobs/${job.id}`)}>
-                <td class="py-2 text-gray-300">{truncateUrl(job.request.url, 50)}</td>
-                <td class="py-2"><Badge text={job.status} color={statusBadge[job.status] ?? 'gray'} /></td>
-                <td class="py-2 text-gray-400">{formatMs(job.result?.elapsed_ms)}</td>
-                <td class="py-2 text-gray-500">{formatDate(job.created_at)}</td>
+              <tr class="border-b border-border-subtle/40 hover:bg-surface-raised/40 cursor-pointer transition-colors"
+                  onclick={() => window.location.hash = `jobs/${job.id}`}>
+                <td class="px-5 py-3 text-sm text-text-secondary">{truncateUrl(job.request.url, 50)}</td>
+                <td class="px-5 py-3"><Badge text={job.status} color={statusColor[job.status] ?? 'gray'} /></td>
+                <td class="px-5 py-3 text-sm text-text-muted tabular-nums">{formatMs(job.result?.elapsed_ms)}</td>
+                <td class="px-5 py-3 text-sm text-text-muted">{formatDate(job.created_at)}</td>
               </tr>
             {/each}
           </tbody>

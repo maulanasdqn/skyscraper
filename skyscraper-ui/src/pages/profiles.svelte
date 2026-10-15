@@ -1,9 +1,8 @@
 <script lang="ts">
-  import Badge from '@components/ui/Badge.svelte'
-  import Button from '@components/ui/Button.svelte'
-  import Card from '@components/ui/Card.svelte'
-  import Input from '@components/ui/Input.svelte'
-  import Modal from '@components/ui/Modal.svelte'
+  import Badge from '@components/ui/badge.svelte'
+  import Button from '@components/ui/button.svelte'
+  import Input from '@components/ui/input.svelte'
+  import Modal from '@components/ui/modal.svelte'
   import { getCosmiumUrl, getCosmiumApiKey } from '@lib/stores/auth.svelte'
   import {
     getCosmiumHealth, listProfiles, getProfile, deleteProfile,
@@ -15,7 +14,7 @@
   let profiles = $state<string[]>([])
   let loading = $state(true)
   let error = $state('')
-  let selectedProfile = $state<{ name: string; data: Record<string, unknown> } | null>(null)
+  let selected = $state<{ name: string; data: Record<string, unknown> } | null>(null)
   let showGenerate = $state(false)
   let genName = $state('')
   let genPersona = $state('')
@@ -23,55 +22,44 @@
   let testResult = $state<Record<string, unknown> | null>(null)
 
   async function load() {
-    loading = true
-    error = ''
-    const url = getCosmiumUrl()
-    const key = getCosmiumApiKey()
-    try {
-      const [h, p] = await Promise.allSettled([
-        getCosmiumHealth(url, key),
-        listProfiles(url, key),
-      ])
-      if (h.status === 'fulfilled') health = h.value
-      if (p.status === 'fulfilled') profiles = p.value.profiles
-    } catch (e) { error = e instanceof Error ? e.message : 'Cannot reach Cosmium' }
+    loading = true; error = ''
+    const [h, p] = await Promise.allSettled([
+      getCosmiumHealth(getCosmiumUrl(), getCosmiumApiKey()),
+      listProfiles(getCosmiumUrl(), getCosmiumApiKey()),
+    ])
+    if (h.status === 'fulfilled') health = h.value
+    if (p.status === 'fulfilled') profiles = p.value.profiles
+    else error = 'Cannot reach Cosmium'
     loading = false
   }
 
   async function viewProfile(name: string) {
     try {
       const data = await getProfile(getCosmiumUrl(), name, getCosmiumApiKey())
-      selectedProfile = { name, data }
-    } catch (e) { error = e instanceof Error ? e.message : 'Failed to load profile' }
+      selected = { name, data }
+    } catch (e) { error = e instanceof Error ? e.message : 'Failed' }
   }
 
   async function handleDelete(name: string) {
-    if (!confirm(`Delete profile "${name}"?`)) return
-    try {
-      await deleteProfile(getCosmiumUrl(), name, getCosmiumApiKey())
-      selectedProfile = null
-      load()
-    } catch (e) { error = e instanceof Error ? e.message : 'Failed' }
+    if (!confirm(`Delete "${name}"?`)) return
+    await deleteProfile(getCosmiumUrl(), name, getCosmiumApiKey())
+    selected = null; load()
   }
 
   async function handleGenerate() {
     genLoading = true
     try {
       await generateProfile(getCosmiumUrl(), genPersona, genName, getCosmiumApiKey())
-      showGenerate = false
-      genName = ''; genPersona = ''
-      load()
+      showGenerate = false; genName = ''; genPersona = ''; load()
     } catch (e) { error = e instanceof Error ? e.message : 'Generation failed' }
     genLoading = false
   }
 
   async function runTest(type: 'fingerprint' | 'stealth') {
-    const url = getCosmiumUrl()
-    const key = getCosmiumApiKey()
     try {
       testResult = type === 'fingerprint'
-        ? await runFingerprintTest(url, key)
-        : await runStealthTest(url, key)
+        ? await runFingerprintTest(getCosmiumUrl(), getCosmiumApiKey())
+        : await runStealthTest(getCosmiumUrl(), getCosmiumApiKey())
     } catch (e) { testResult = { error: e instanceof Error ? e.message : 'Test failed' } }
   }
 
@@ -79,71 +67,73 @@
 </script>
 
 <div class="space-y-4">
-  {#if health}
-    <div class="flex items-center gap-3 text-sm">
-      <Badge text={health.status} color={health.status === 'ok' ? 'green' : 'red'} />
-      <span class="text-gray-400">Cosmium {health.version}</span>
-      <Badge text={health.binary_found ? 'binary OK' : 'no binary'} color={health.binary_found ? 'green' : 'red'} />
-      {#if health.llm_configured}
-        <Badge text="AI enabled" color="purple" />
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-text-primary">Profiles</h1>
+      {#if health}
+        <div class="flex items-center gap-2 mt-1">
+          <Badge text={health.status === 'ok' ? 'connected' : 'error'} color={health.status === 'ok' ? 'green' : 'red'} />
+          {#if health.llm_configured}<Badge text="AI" color="purple" />{/if}
+        </div>
       {/if}
     </div>
-  {/if}
-
-  {#if error}<p class="text-sm text-red-400">{error}</p>{/if}
-
-  <div class="flex gap-2">
-    <Button size="sm" onclick={() => (showGenerate = true)}>Generate Profile</Button>
-    <Button size="sm" variant="secondary" onclick={() => runTest('fingerprint')}>Fingerprint Test</Button>
-    <Button size="sm" variant="secondary" onclick={() => runTest('stealth')}>Stealth Test</Button>
-    <Button size="sm" variant="ghost" onclick={load}>Refresh</Button>
+    <div class="flex gap-2">
+      <Button size="sm" onclick={() => (showGenerate = true)}>Generate</Button>
+      <Button size="sm" variant="secondary" onclick={() => runTest('fingerprint')}>Fingerprint</Button>
+      <Button size="sm" variant="secondary" onclick={() => runTest('stealth')}>Stealth</Button>
+    </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <Card title="Profiles ({profiles.length})">
+  {#if error}<p class="text-sm text-danger">{error}</p>{/if}
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+    <div class="lg:col-span-2 rounded-xl border border-border-subtle bg-surface overflow-hidden">
+      <div class="px-4 py-2.5 border-b border-border-subtle">
+        <span class="text-xs text-text-muted">{profiles.length} profiles</span>
+      </div>
       {#if loading}
-        <p class="text-sm text-gray-500 animate-pulse">Loading...</p>
+        <div class="p-4 text-sm text-text-muted">Loading...</div>
       {:else if profiles.length === 0}
-        <p class="text-sm text-gray-500">No profiles found. Configure Cosmium URL in Settings.</p>
+        <div class="p-4 text-sm text-text-muted">No profiles</div>
       {:else}
-        <div class="space-y-1 max-h-96 overflow-y-auto">
+        <div class="max-h-80 overflow-y-auto">
           {#each profiles as name}
             <button
-              class="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors
-                {selectedProfile?.name === name
-                  ? 'bg-indigo-600/20 text-indigo-400'
-                  : 'text-gray-300 hover:bg-gray-800'}"
+              class="w-full text-left px-4 py-2 text-sm border-b border-border-subtle/50 transition-colors
+                {selected?.name === name ? 'bg-accent-muted text-accent' : 'text-text-secondary hover:bg-surface-raised'}"
               onclick={() => viewProfile(name)}>
               {name}
             </button>
           {/each}
         </div>
       {/if}
-    </Card>
+    </div>
 
-    <Card title={selectedProfile ? selectedProfile.name : 'Profile Details'}>
-      {#if selectedProfile}
-        <div class="flex gap-2 mb-3">
-          <Button size="sm" variant="danger" onclick={() => handleDelete(selectedProfile!.name)}>Delete</Button>
+    <div class="lg:col-span-3 rounded-xl border border-border-subtle bg-surface overflow-hidden">
+      {#if selected}
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
+          <span class="text-sm text-text-secondary font-medium">{selected.name}</span>
+          <button class="text-xs text-danger hover:underline" onclick={() => handleDelete(selected!.name)}>Delete</button>
         </div>
-        <pre class="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-80 whitespace-pre-wrap"
-          >{JSON.stringify(selectedProfile.data, null, 2)}</pre>
+        <pre class="p-4 text-xs text-text-secondary font-mono overflow-auto max-h-80 leading-relaxed">{JSON.stringify(selected.data, null, 2)}</pre>
       {:else}
-        <p class="text-sm text-gray-500">Select a profile to view details</p>
+        <div class="p-8 text-center text-sm text-text-muted">Select a profile</div>
       {/if}
-    </Card>
+    </div>
   </div>
 
   {#if testResult}
-    <Card title="Test Result">
-      <pre class="bg-gray-800 rounded-lg p-3 text-xs text-green-400 overflow-auto max-h-60 whitespace-pre-wrap"
-        >{JSON.stringify(testResult, null, 2)}</pre>
-      <Button size="sm" variant="ghost" onclick={() => (testResult = null)} class="mt-2">Dismiss</Button>
-    </Card>
+    <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
+        <span class="text-xs text-text-muted uppercase tracking-wider">Test Result</span>
+        <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => (testResult = null)}>Dismiss</button>
+      </div>
+      <pre class="p-4 text-xs text-text-secondary font-mono overflow-auto max-h-60 leading-relaxed">{JSON.stringify(testResult, null, 2)}</pre>
+    </div>
   {/if}
 </div>
 
-<Modal bind:open={showGenerate} title="Generate Profile (AI)">
+<Modal bind:open={showGenerate} title="Generate Profile">
   <div class="space-y-3">
     <Input label="Profile Name" bind:value={genName} placeholder="chrome-linux-dev" />
     <Input label="Persona" bind:value={genPersona} placeholder="Developer using Linux with Chrome" />
