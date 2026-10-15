@@ -78,7 +78,7 @@ impl ScrapeClient for CosmiumClient {
 
         let resp = self
             .client
-            .post(format!("{}/api/scrape", self.base_url))
+            .post(format!("{}/api/v1/scrape", self.base_url))
             .json(&body)
             .send()
             .await
@@ -160,7 +160,7 @@ impl CosmiumClient {
     async fn fetch_profiles(&self) -> Result<Vec<String>, DomainError> {
         let resp = self
             .client
-            .get(format!("{}/api/profiles", self.base_url))
+            .get(format!("{}/api/v1/profiles", self.base_url))
             .send()
             .await
             .map_err(|e| DomainError::Upstream(format!("cosmium profiles: {e}")))?;
