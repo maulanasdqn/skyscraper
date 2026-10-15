@@ -11,8 +11,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 const JSON_HEADERS: HeadersInit = { 'Content-Type': 'application/json' }
 
-function api(baseUrl: string, path: string): string {
-  if (baseUrl.startsWith('http')) return `${baseUrl}/api${path}`
+function api(_baseUrl: string, path: string): string {
   return `/parallax${path}`
 }
 

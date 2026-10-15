@@ -28,8 +28,7 @@ export interface ProfileSummary {
   platform?: string
 }
 
-function base(url: string): string {
-  if (url.startsWith('http')) return url
+function base(_url: string): string {
   return ''
 }
 
@@ -90,4 +89,22 @@ export const runStealthTest = (baseUrl: string, apiKey?: string) =>
   request<Record<string, unknown>>(`${base(baseUrl)}/cosmium/v1/tests/stealth`, {
     method: 'POST',
     headers: headers(apiKey),
+  })
+
+export interface AiFormatResponse {
+  data: Record<string, unknown>
+  model: string
+}
+
+export const aiFormat = (
+  baseUrl: string,
+  scrapeUrl: string,
+  instruction: string,
+  data: Record<string, unknown>,
+  apiKey?: string,
+) =>
+  request<AiFormatResponse>(`${base(baseUrl)}/cosmium/v1/scrape/format`, {
+    method: 'POST',
+    headers: headers(apiKey),
+    body: JSON.stringify({ url: scrapeUrl, instruction, data }),
   })
