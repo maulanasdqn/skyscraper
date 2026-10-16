@@ -4,3 +4,6 @@ target/
 *.swp
 *.swo
 .DS_Store
+skyscraper-ui/node_modules/
+skyscraper-ui/dist/
+/tmp/

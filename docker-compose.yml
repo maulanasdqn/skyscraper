@@ -12,59 +12,82 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U skyscraper"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+    restart: unless-stopped
 
-  api:
-    build: .
-    command: skyscraper-api
+  skyscraper-api:
+    build:
+      context: .
+      dockerfile: skyscraper-api/Dockerfile
     ports:
       - "3002:3002"
     environment:
       DATABASE_URL: postgres://skyscraper:skyscraper@postgres:5432/skyscraper
       REDIS_URL: redis://redis:6379
-      API_LISTEN: 0.0.0.0:3002
-      API_ADMIN_KEY: sk_admin_dev
-      PROXY_PASS: dev_secret
-      PARALLAX_URL: http://host.docker.internal:3001
-      PARALLAX_PROXY_HOST: host.docker.internal
-      PARALLAX_PROXY_PORT: "1080"
-      COSMIUM_URL: http://host.docker.internal:3000
+      API_LISTEN: "0.0.0.0:3002"
+      API_ADMIN_KEY: ${API_ADMIN_KEY:-sk_admin_dev}
+      PROXY_PASS: ${PROXY_PASS:-dev_secret}
+      PARALLAX_URL: ${PARALLAX_URL:-http://host.docker.internal:3001}
+      PARALLAX_PROXY_HOST: ${PARALLAX_PROXY_HOST:-host.docker.internal}
+      PARALLAX_PROXY_PORT: ${PARALLAX_PROXY_PORT:-1080}
+      COSMIUM_URL: ${COSMIUM_URL:-http://host.docker.internal:3000}
+      CACHE_TTL_SECS: ${CACHE_TTL_SECS:-300}
       RUST_LOG: skyscraper=info
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
 
-  worker:
-    build: .
-    command: skyscraper-worker
+  skyscraper-worker:
+    build:
+      context: .
+      dockerfile: skyscraper-worker/Dockerfile
     environment:
       DATABASE_URL: postgres://skyscraper:skyscraper@postgres:5432/skyscraper
       REDIS_URL: redis://redis:6379
-      PROXY_PASS: dev_secret
-      PARALLAX_URL: http://host.docker.internal:3001
-      PARALLAX_PROXY_HOST: host.docker.internal
-      PARALLAX_PROXY_PORT: "1080"
-      COSMIUM_URL: http://host.docker.internal:3000
-      WORKER_CONCURRENCY: "4"
+      PROXY_PASS: ${PROXY_PASS:-dev_secret}
+      PARALLAX_URL: ${PARALLAX_URL:-http://host.docker.internal:3001}
+      PARALLAX_PROXY_HOST: ${PARALLAX_PROXY_HOST:-host.docker.internal}
+      PARALLAX_PROXY_PORT: ${PARALLAX_PROXY_PORT:-1080}
+      COSMIUM_URL: ${COSMIUM_URL:-http://host.docker.internal:3000}
+      COSMIUM_API_KEY: ${COSMIUM_API_KEY:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      CACHE_TTL_SECS: ${CACHE_TTL_SECS:-300}
+      DOMAIN_MAX_RPM: ${DOMAIN_MAX_RPM:-120}
       RUST_LOG: skyscraper=info
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  skyscraper-ui:
+    build:
+      context: skyscraper-ui
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - skyscraper-api
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  redisdata:
