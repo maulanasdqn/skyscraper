@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatMs, formatBytes } from '@lib/utils/format'
+  import { downloadJson, downloadCsv } from '@lib/utils/export'
   import type { ScrapeResult } from '@lib/types'
 
   let {
@@ -18,6 +19,7 @@
 
   let tab = $state<'ai' | 'meta' | 'extracted' | 'html' | 'render'>('meta')
   let copied = $state(false)
+  let exportOpen = $state(false)
 
   let hasExtracted = $derived(scrape.extracted && Object.keys(scrape.extracted).length > 0)
   let displayTime = $derived(wallTimeMs > 0 ? formatMs(wallTimeMs) : formatMs(scrape.elapsed_ms))
@@ -53,6 +55,14 @@
     copied = true
     setTimeout(() => (copied = false), 1500)
   }
+
+  function exportAs(format: 'json' | 'csv') {
+    const data = aiResult?.data ?? scrape.extracted ?? {}
+    const name = new URL(scrape.final_url || 'result').hostname.replace(/\./g, '-') || 'result'
+    if (format === 'json') downloadJson(data, `${name}.json`)
+    else downloadCsv(data as Record<string, unknown>, `${name}.csv`)
+    exportOpen = false
+  }
 </script>
 
 <div class="rounded-xl border {isBlocked ? 'border-warning/30' : 'border-border-subtle'} bg-surface overflow-hidden">
@@ -76,6 +86,23 @@
           {/if}
         </button>
       {/if}
+      <div class="relative">
+        <button onclick={() => (exportOpen = !exportOpen)}
+          class="text-[11px] text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Export
+        </button>
+        {#if exportOpen}
+          <div class="absolute right-0 top-full mt-1 bg-surface-overlay border border-border-subtle rounded-lg shadow-lg z-50 py-1 min-w-[100px]">
+            <button onclick={() => exportAs('json')}
+              class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-raised transition-colors">JSON</button>
+            <button onclick={() => exportAs('csv')}
+              class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-raised transition-colors">CSV</button>
+          </div>
+        {/if}
+      </div>
       {#if jobId}
         <a href="#{`jobs/${jobId}`}" class="text-[11px] text-accent hover:text-accent-hover">View job</a>
       {/if}

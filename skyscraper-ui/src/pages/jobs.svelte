@@ -8,6 +8,7 @@
   } from '@lib/stores/jobs.svelte'
   import { cancelJob, retryJob } from '@lib/api/skyscraper'
   import { formatDate, formatMs, truncateUrl } from '@lib/utils/format'
+  import { downloadJson, downloadCsv } from '@lib/utils/export'
   import type { JobStatus } from '@lib/types'
 
   const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
@@ -16,6 +17,18 @@
   }
 
   let filterVal = $state(getStatusFilter())
+  let exportOpen = $state(false)
+
+  function exportJobs(format: 'json' | 'csv') {
+    const jobs = getJobs().map((j) => ({
+      id: j.id, url: j.request.url, status: j.status,
+      elapsed_ms: j.result?.elapsed_ms ?? '', created_at: j.created_at,
+      error: j.error ?? '',
+    }))
+    if (format === 'json') downloadJson(jobs, 'jobs.json')
+    else downloadCsv(jobs, 'jobs.csv')
+    exportOpen = false
+  }
 
   async function load() {
     const key = await ensureTenant()
@@ -23,7 +36,7 @@
   }
 
   function onFilterChange(val: string) {
-    filterVal = val
+    filterVal = val as JobStatus | ''
     setStatusFilter(val as JobStatus | '')
     load()
   }
@@ -60,6 +73,23 @@
         <option value="failed">Failed</option>
       </select>
       <span class="text-xs text-text-muted tabular-nums">{getTotal()} total</span>
+      <div class="relative">
+        <button onclick={() => (exportOpen = !exportOpen)}
+          class="text-xs text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Export
+        </button>
+        {#if exportOpen}
+          <div class="absolute right-0 top-full mt-1 bg-surface-overlay border border-border-subtle rounded-lg shadow-lg z-50 py-1 min-w-[100px]">
+            <button onclick={() => exportJobs('json')}
+              class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-raised transition-colors">JSON</button>
+            <button onclick={() => exportJobs('csv')}
+              class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-raised transition-colors">CSV</button>
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
 
