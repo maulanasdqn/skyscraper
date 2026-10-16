@@ -8,6 +8,7 @@
     getCosmiumUrl, setCosmiumUrl,
     getParallaxUrl, setParallaxUrl,
     getCosmiumApiKey, setCosmiumApiKey,
+    getWebhookUrl, setWebhookUrl,
   } from '@lib/stores/auth.svelte'
   import { getHealth } from '@lib/api/skyscraper'
   import { getCosmiumHealth } from '@lib/api/cosmium'
@@ -18,6 +19,8 @@
   let cosmiumVal = $state(getCosmiumUrl())
   let parallaxVal = $state(getParallaxUrl())
   let cosmiumKeyVal = $state(getCosmiumApiKey())
+  let webhookVal = $state(getWebhookUrl())
+  let webhookValid = $state<'idle' | 'valid' | 'invalid'>('idle')
 
   let skyStatus = $state<'idle' | 'testing' | 'ok' | 'fail'>('idle')
   let cosStatus = $state<'idle' | 'testing' | 'ok' | 'fail'>('idle')
@@ -27,7 +30,12 @@
   function handleSave() {
     setAdminKey(adminVal); setTenantApiKey(tenantVal)
     setCosmiumUrl(cosmiumVal); setParallaxUrl(parallaxVal); setCosmiumApiKey(cosmiumKeyVal)
+    setWebhookUrl(webhookVal)
     saved = true; setTimeout(() => (saved = false), 2000)
+  }
+
+  function testWebhook() {
+    try { new URL(webhookVal); webhookValid = 'valid' } catch { webhookValid = 'invalid' }
   }
 
   async function testSky() { skyStatus = 'testing'; try { await getHealth(); skyStatus = 'ok' } catch { skyStatus = 'fail' } }
@@ -77,6 +85,21 @@
         <button class="text-xs text-text-muted hover:text-text-secondary mb-1" onclick={testPlx}>Test</button>
         <div class="mb-1"><Badge {...statusBadge(plxStatus)} /></div>
       </div>
+    </div>
+
+    <div class="p-4 space-y-3">
+      <h3 class="text-xs text-text-muted uppercase tracking-wider">Webhooks</h3>
+      <p class="text-xs text-text-muted">Receive POST notifications when jobs complete or fail</p>
+      <div class="flex items-end gap-3">
+        <div class="flex-1"><Input label="Webhook URL" bind:value={webhookVal} placeholder="https://your-server.com/webhook" /></div>
+        <button class="text-xs text-text-muted hover:text-text-secondary mb-1" onclick={testWebhook}>Validate</button>
+        {#if webhookValid === 'valid'}
+          <div class="mb-1"><Badge text="Valid" color="green" /></div>
+        {:else if webhookValid === 'invalid'}
+          <div class="mb-1"><Badge text="Invalid" color="red" /></div>
+        {/if}
+      </div>
+      <p class="text-[10px] text-text-muted">Payload: {"{"} job_id, status, result, error {"}"}</p>
     </div>
   </div>
 

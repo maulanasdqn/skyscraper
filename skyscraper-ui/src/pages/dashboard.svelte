@@ -14,6 +14,8 @@
   let recentJobs = $state<Job[]>([])
   let skyHealth = $state<string>('...')
   let cosHealth = $state<string>('...')
+  let rpmLimit = $state(600)
+  let rpmUsed = $state(0)
 
   const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow',
@@ -38,6 +40,9 @@
     if (m.status === 'fulfilled') metrics = m.value
     if (q.status === 'fulfilled') queue = q.value
     if (jobs.status === 'fulfilled') recentJobs = jobs.value.data
+    if (q.status === 'fulfilled') {
+      rpmUsed = Number(queue?.processing ?? 0) + Number(queue?.pending ?? 0)
+    }
     skyHealth = h.status === 'fulfilled' ? 'online' : 'offline'
     try {
       await getCosmiumHealth(getCosmiumUrl(), getCosmiumApiKey())
@@ -97,14 +102,25 @@
       </div>
     </Card>
 
-    <Card title="Quick Actions">
-      <div class="space-y-2.5">
-        <a href="#playground" class="flex items-center gap-2 text-sm text-accent hover:text-accent-hover transition-colors">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          New Scrape
-        </a>
-        <a href="#jobs" class="block text-sm text-text-secondary hover:text-text-primary transition-colors">View Jobs</a>
-        <a href="#metrics" class="block text-sm text-text-secondary hover:text-text-primary transition-colors">Metrics</a>
+    <Card title="Rate Limits & Webhooks">
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-xs mb-1.5">
+            <span class="text-text-muted">RPM Usage</span>
+            <span class="text-text-secondary tabular-nums">{rpmUsed} / {rpmLimit}</span>
+          </div>
+          <div class="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
+            <div class="h-full rounded-full bg-accent transition-all" style="width: {Math.min((rpmUsed / rpmLimit) * 100, 100)}%"></div>
+          </div>
+        </div>
+        <div class="flex justify-between text-xs">
+          <span class="text-text-muted">Webhook Deliveries</span>
+          <span class="text-success tabular-nums">{metrics?.webhook_deliveries ?? 0}</span>
+        </div>
+        <div class="flex justify-between text-xs">
+          <span class="text-text-muted">Webhook Failures</span>
+          <span class="{(metrics?.webhook_failures ?? 0) > 0 ? 'text-danger' : 'text-text-secondary'} tabular-nums">{metrics?.webhook_failures ?? 0}</span>
+        </div>
       </div>
     </Card>
   </div>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Badge from '@components/ui/badge.svelte'
   import Button from '@components/ui/button.svelte'
-  import { ensureTenant } from '@lib/stores/auth.svelte'
+  import { ensureTenant, getWebhookUrl } from '@lib/stores/auth.svelte'
   import { getJob, cancelJob, retryJob, getScreenshotUrl } from '@lib/api/skyscraper'
   import { formatDate, formatMs, formatBytes } from '@lib/utils/format'
   import type { Job } from '@lib/types'
@@ -14,6 +14,7 @@
   let pollTimer = $state<ReturnType<typeof setInterval> | null>(null)
 
   const TERMINAL = new Set(['completed', 'failed', 'dead'])
+  let webhookConfigured = $derived(getWebhookUrl().length > 0)
   const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow', failed: 'red', dead: 'gray',
   }
@@ -115,6 +116,21 @@
         {/each}
         {#if job.error}
           <div class="mt-2 p-3 rounded-lg bg-danger/5 border border-danger/10 text-xs text-danger font-mono">{job.error}</div>
+        {/if}
+        {#if webhookConfigured}
+          <div class="mt-3 pt-3 border-t border-border-subtle">
+            <div class="flex items-center gap-2 text-xs">
+              <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="text-text-muted">Webhook</span>
+              {#if TERMINAL.has(job.status)}
+                <span class="text-success">delivered</span>
+              {:else}
+                <span class="text-text-muted">pending</span>
+              {/if}
+            </div>
+          </div>
         {/if}
       </div>
     </div>

@@ -24,6 +24,7 @@ const KEYS = {
   cosmium: 'skyscraper_cosmium_url',
   parallax: 'skyscraper_parallax_url',
   cosmiumApiKey: 'skyscraper_cosmium_api_key',
+  webhookUrl: 'skyscraper_webhook_url',
 } as const
 
 let adminKey = $state(loadKey(KEYS.admin, DEFAULT_ADMIN_KEY))
@@ -31,6 +32,7 @@ let tenantApiKey = $state(loadKey(KEYS.tenant, ''))
 let cosmiumUrl = $state(loadKey(KEYS.cosmium, DEFAULT_COSMIUM_URL))
 let parallaxUrl = $state(loadKey(KEYS.parallax, DEFAULT_PARALLAX_URL))
 let cosmiumApiKey = $state(loadKey(KEYS.cosmiumApiKey, 'dev-key'))
+let webhookUrl = $state(loadKey(KEYS.webhookUrl, ''))
 let provisioning = $state(false)
 
 export function getAdminKey() { return adminKey }
@@ -61,6 +63,12 @@ export function getCosmiumApiKey() { return cosmiumApiKey }
 export function setCosmiumApiKey(value: string) {
   cosmiumApiKey = value
   persist(KEYS.cosmiumApiKey, value)
+}
+
+export function getWebhookUrl() { return webhookUrl }
+export function setWebhookUrl(value: string) {
+  webhookUrl = value
+  persist(KEYS.webhookUrl, value)
 }
 
 export function isAdminConfigured(): boolean { return adminKey.length > 0 }
