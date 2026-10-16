@@ -5,6 +5,7 @@ pub mod error;
 pub mod health;
 pub mod jobs;
 pub mod jobs_extra;
+mod link_extract;
 pub mod middleware;
 pub mod pagination;
 pub mod results;
