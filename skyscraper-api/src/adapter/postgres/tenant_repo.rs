@@ -122,6 +122,28 @@ impl TenantRepository for PgTenantRepository {
         Ok(())
     }
 
+    async fn set_limits(
+        &self,
+        id: Uuid,
+        rate_limit_rpm: i32,
+        concurrent_limit: i32,
+    ) -> Result<(), DomainError> {
+        let result = sqlx::query(
+            "UPDATE tenants SET rate_limit_rpm = $1, concurrent_limit = $2 WHERE id = $3",
+        )
+        .bind(rate_limit_rpm)
+        .bind(concurrent_limit)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+
+        if result.rows_affected() == 0 {
+            return Err(DomainError::NotFound(format!("tenant {id}")));
+        }
+        Ok(())
+    }
+
     async fn regenerate_api_key(&self, id: Uuid) -> Result<String, DomainError> {
         let new_key = format!("sk_{}", Uuid::new_v4());
         let result = sqlx::query("UPDATE tenants SET api_key = $1 WHERE id = $2")

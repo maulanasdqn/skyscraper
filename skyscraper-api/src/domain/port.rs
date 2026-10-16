@@ -20,6 +20,7 @@ pub trait TenantRepository: Send + Sync {
     async fn update_plan(&self, id: Uuid, plan: TenantPlan) -> Result<()>;
     async fn set_active(&self, id: Uuid, active: bool) -> Result<()>;
     async fn set_webhook_url(&self, id: Uuid, url: Option<&str>) -> Result<()>;
+    async fn set_limits(&self, id: Uuid, rate_limit_rpm: i32, concurrent_limit: i32) -> Result<()>;
     async fn regenerate_api_key(&self, id: Uuid) -> Result<String>;
 }
 

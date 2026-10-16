@@ -94,6 +94,17 @@ impl TenantRepository for MockTenantRepository {
         }
     }
 
+    async fn set_limits(&self, id: Uuid, rate_limit_rpm: i32, concurrent_limit: i32) -> Result<(), DomainError> {
+        let mut tenants = self.tenants.lock().unwrap();
+        if let Some(t) = tenants.iter_mut().find(|t| t.id == id) {
+            t.rate_limit_rpm = rate_limit_rpm;
+            t.concurrent_limit = concurrent_limit;
+            Ok(())
+        } else {
+            Err(DomainError::NotFound("tenant".into()))
+        }
+    }
+
     async fn regenerate_api_key(&self, id: Uuid) -> Result<String, DomainError> {
         let mut tenants = self.tenants.lock().unwrap();
         if let Some(t) = tenants.iter_mut().find(|t| t.id == id) {

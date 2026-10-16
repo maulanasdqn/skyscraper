@@ -39,6 +39,8 @@ pub struct UpdateTenantRequest {
     pub plan: Option<TenantPlan>,
     pub active: Option<bool>,
     pub webhook_url: Option<String>,
+    pub rate_limit_rpm: Option<i32>,
+    pub concurrent_limit: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -77,10 +79,10 @@ pub async fn list_tenants(
     _admin: AdminAuth,
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListQuery>,
-) -> ApiResult<Json<Vec<Tenant>>> {
+) -> ApiResult<Json<Vec<TenantCreatedResponse>>> {
     let offset = (q.page - 1) * q.per_page;
     let tenants = state.tenant_repo.list(q.per_page, offset).await?;
-    Ok(Json(tenants))
+    Ok(Json(tenants.into_iter().map(Into::into).collect()))
 }
 
 pub async fn create_tenant(
@@ -115,6 +117,16 @@ pub async fn update_tenant(
             Some(url.as_str())
         };
         state.tenant_repo.set_webhook_url(id, url_opt).await?;
+    }
+    if body.rate_limit_rpm.is_some() || body.concurrent_limit.is_some() {
+        let current = state
+            .tenant_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| crate::domain::error::DomainError::NotFound(format!("tenant {id}")))?;
+        let rpm = body.rate_limit_rpm.unwrap_or(current.rate_limit_rpm);
+        let conc = body.concurrent_limit.unwrap_or(current.concurrent_limit);
+        state.tenant_repo.set_limits(id, rpm, conc).await?;
     }
     Ok(Json(serde_json::json!({ "updated": true })))
 }
