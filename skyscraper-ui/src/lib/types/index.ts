@@ -108,3 +108,9 @@ export interface UsageInfo {
   period_start: string
   period_end: string
 }
+
+export interface CrawlResponse {
+  crawl_id: string
+  job_ids: string[]
+  pages_discovered: number
+}

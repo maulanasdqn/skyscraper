@@ -91,6 +91,19 @@ export const scrapeSync = (apiKey: string, data: SubmitJobData, timeoutMs = 6000
     apiKey,
   )
 
+export interface CrawlData {
+  start_url: string
+  max_pages?: number
+  max_depth?: number
+  extract?: string[]
+  screenshot?: boolean
+  include_html?: boolean
+  geo?: string
+}
+
+export const submitCrawl = (apiKey: string, data: CrawlData) =>
+  post<import('@lib/types').CrawlResponse>('/crawl', data, apiKey)
+
 // ── Results ─────────────────────────────────────────────
 
 export const getResult = (apiKey: string, id: string) =>
