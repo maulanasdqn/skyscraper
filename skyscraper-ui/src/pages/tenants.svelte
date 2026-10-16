@@ -18,6 +18,8 @@
   let newPlan = $state<string>('free')
   let newRpm = $state('60')
   let newConc = $state('5')
+  let editRpm = $state('')
+  let editConc = $state('')
 
   const planOpts = [
     { value: 'free', label: 'Free' }, { value: 'starter', label: 'Starter' },
@@ -51,8 +53,8 @@
     const key = getAdminKey()
     if (!key || !editTenant) return
     await updateTenant(key, editTenant.id, {
-      plan: editTenant.plan, rate_limit_rpm: editTenant.rate_limit_rpm,
-      concurrent_limit: editTenant.concurrent_limit, webhook_url: editTenant.webhook_url,
+      plan: editTenant.plan, rate_limit_rpm: parseInt(editRpm) || editTenant.rate_limit_rpm,
+      concurrent_limit: parseInt(editConc) || editTenant.concurrent_limit, webhook_url: editTenant.webhook_url,
     })
     editTenant = null; load()
   }
@@ -97,7 +99,7 @@
               <td class="px-4 py-2.5"><Badge text={t.active ? 'active' : 'inactive'}
                 color={t.active ? 'green' : 'red'} /></td>
               <td class="px-4 py-2.5 space-x-2">
-                <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => (editTenant = { ...t })}>Edit</button>
+                <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => { editTenant = { ...t }; editRpm = String(t.rate_limit_rpm); editConc = String(t.concurrent_limit) }}>Edit</button>
                 <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => handleRegen(t.id)}>Regen</button>
               </td>
             </tr>
@@ -127,10 +129,8 @@
   {#if editTenant}
     <div class="space-y-3">
       <Select label="Plan" options={planOpts} bind:value={editTenant.plan} />
-      <Input label="RPM Limit" type="number" value={String(editTenant.rate_limit_rpm)}
-        oninput={(e: Event) => { if (editTenant) editTenant.rate_limit_rpm = parseInt((e.target as HTMLInputElement).value) }} />
-      <Input label="Concurrent" type="number" value={String(editTenant.concurrent_limit)}
-        oninput={(e: Event) => { if (editTenant) editTenant.concurrent_limit = parseInt((e.target as HTMLInputElement).value) }} />
+      <Input label="RPM Limit" type="number" bind:value={editRpm} />
+      <Input label="Concurrent" type="number" bind:value={editConc} />
       <div class="flex justify-end gap-2 pt-2">
         <Button variant="ghost" onclick={() => (editTenant = null)}>Cancel</Button>
         <Button onclick={handleUpdate}>Save</Button>
