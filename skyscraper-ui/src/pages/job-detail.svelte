@@ -4,6 +4,7 @@
   import { ensureTenant, getWebhookUrl } from '@lib/stores/auth.svelte'
   import { getJob, cancelJob, retryJob, getScreenshotUrl } from '@lib/api/skyscraper'
   import { formatDate, formatMs, formatBytes } from '@lib/utils/format'
+  import { downloadJson, downloadCsv } from '@lib/utils/export'
   import type { Job } from '@lib/types'
 
   let { jobId = '' }: { jobId?: string } = $props()
@@ -13,7 +14,24 @@
   let error = $state('')
   let pollTimer = $state<ReturnType<typeof setInterval> | null>(null)
 
+  let copied = $state(false)
   const TERMINAL = new Set(['completed', 'failed', 'dead'])
+
+  function hl(obj: unknown): string {
+    return JSON.stringify(obj, null, 2)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"([^"]+)":/g, '<span class="text-accent">"$1"</span>:')
+      .replace(/: "([^"]*)"/g, ': <span class="text-success">"$1"</span>')
+      .replace(/: (\d+\.?\d*)/g, ': <span class="text-warning">$1</span>')
+      .replace(/: (true|false)/g, ': <span class="text-info">$1</span>')
+      .replace(/: (null)/g, ': <span class="text-text-muted">$1</span>')
+  }
+
+  async function copyResult() {
+    if (!job?.result?.extracted) return
+    await navigator.clipboard.writeText(JSON.stringify(job.result.extracted, null, 2))
+    copied = true; setTimeout(() => (copied = false), 1500)
+  }
   let webhookConfigured = $derived(getWebhookUrl().length > 0)
   const statusColor: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
     completed: 'green', running: 'blue', pending: 'yellow', failed: 'red', dead: 'gray',
@@ -137,16 +155,24 @@
 
     {#if job.result}
       <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
-        <div class="flex items-center gap-5 px-5 py-3.5 border-b border-border-subtle text-sm">
-          <span class="text-text-muted">HTTP <span class="text-text-secondary font-medium">{job.result.http_status}</span></span>
-          <span class="text-text-muted">{formatMs(job.result.elapsed_ms)}</span>
-          <span class="text-text-muted">{formatBytes(job.result.html_length)}</span>
-          <span class="text-text-muted">{job.result.profile_used}</span>
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-border-subtle text-sm">
+          <div class="flex items-center gap-5">
+            <span class="text-text-muted">HTTP <span class="text-text-secondary font-medium">{job.result.http_status}</span></span>
+            <span class="text-text-muted">{formatMs(job.result.elapsed_ms)}</span>
+            <span class="text-text-muted">{formatBytes(job.result.html_length)}</span>
+            <span class="text-text-muted">{job.result.profile_used}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick={copyResult} class="text-[11px] text-text-muted hover:text-text-secondary transition-colors">
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+            <button onclick={() => downloadJson(job?.result?.extracted, `job-${jobId.slice(0,8)}.json`)}
+              class="text-[11px] text-text-muted hover:text-text-secondary transition-colors">JSON</button>
+            <button onclick={() => downloadCsv(job?.result?.extracted ?? {}, `job-${jobId.slice(0,8)}.csv`)}
+              class="text-[11px] text-text-muted hover:text-text-secondary transition-colors">CSV</button>
+          </div>
         </div>
-        <div class="relative">
-          <div class="absolute top-3 right-4 text-[10px] text-text-muted uppercase tracking-wider">JSON</div>
-          <pre class="p-5 text-xs text-text-secondary font-mono overflow-x-auto max-h-96 leading-relaxed">{JSON.stringify(job.result.extracted, null, 2)}</pre>
-        </div>
+        <pre class="p-5 text-xs font-mono overflow-x-auto max-h-96 leading-relaxed">{@html hl(job.result.extracted)}</pre>
         {#if job.result.screenshot_base64}
           <div class="p-5 border-t border-border-subtle">
             <img src={getScreenshotUrl(job.id)} alt="Screenshot" class="rounded-xl border border-border-subtle max-w-full" />
