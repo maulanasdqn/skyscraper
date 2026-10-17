@@ -1,8 +1,18 @@
 use super::error::DomainError;
 
+const MAX_URL_LENGTH: usize = 4096;
+const MAX_EMAIL_LENGTH: usize = 320;
+const MAX_WEBHOOK_URL_LENGTH: usize = 2048;
+
 pub fn validate_scrape_url(url: &str) -> Result<(), DomainError> {
     if url.is_empty() {
         return Err(DomainError::InvalidInput("url is required".into()));
+    }
+
+    if url.len() > MAX_URL_LENGTH {
+        return Err(DomainError::InvalidInput(
+            format!("url exceeds maximum length of {MAX_URL_LENGTH}"),
+        ));
     }
 
     if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -19,6 +29,44 @@ pub fn validate_scrape_url(url: &str) -> Result<(), DomainError> {
         ));
     }
 
+    Ok(())
+}
+
+pub fn validate_email(email: &str) -> Result<(), DomainError> {
+    if email.is_empty() {
+        return Err(DomainError::InvalidInput("email is required".into()));
+    }
+    if email.len() > MAX_EMAIL_LENGTH {
+        return Err(DomainError::InvalidInput("email too long".into()));
+    }
+    if !email.contains('@') || email.starts_with('@') || email.ends_with('@') {
+        return Err(DomainError::InvalidInput("invalid email format".into()));
+    }
+    if email.contains(' ') || email.contains('\n') || email.contains('\r') {
+        return Err(DomainError::InvalidInput("email contains invalid characters".into()));
+    }
+    Ok(())
+}
+
+pub fn validate_webhook_url(url: &str) -> Result<(), DomainError> {
+    if url.is_empty() {
+        return Ok(());
+    }
+    if url.len() > MAX_WEBHOOK_URL_LENGTH {
+        return Err(DomainError::InvalidInput("webhook url too long".into()));
+    }
+    if !url.starts_with("https://") {
+        return Err(DomainError::InvalidInput(
+            "webhook url must use https".into(),
+        ));
+    }
+    let host = extract_host(url)
+        .ok_or_else(|| DomainError::InvalidInput("invalid webhook url".into()))?;
+    if is_private_host(&host) {
+        return Err(DomainError::InvalidInput(
+            "webhook to private/internal addresses is not allowed".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -125,5 +173,40 @@ mod tests {
     fn public_ips_allowed() {
         assert!(validate_scrape_url("http://8.8.8.8").is_ok());
         assert!(validate_scrape_url("http://1.1.1.1").is_ok());
+    }
+
+    #[test]
+    fn url_length_limit() {
+        let long = format!("https://example.com/{}", "a".repeat(5000));
+        assert!(validate_scrape_url(&long).is_err());
+    }
+
+    #[test]
+    fn valid_email() {
+        assert!(validate_email("user@example.com").is_ok());
+    }
+
+    #[test]
+    fn invalid_emails() {
+        assert!(validate_email("").is_err());
+        assert!(validate_email("noatsign").is_err());
+        assert!(validate_email("@leading").is_err());
+        assert!(validate_email("trailing@").is_err());
+        assert!(validate_email("has space@x.com").is_err());
+    }
+
+    #[test]
+    fn webhook_must_be_https() {
+        assert!(validate_webhook_url("https://hooks.example.com/cb").is_ok());
+        assert!(validate_webhook_url("http://hooks.example.com/cb").is_err());
+        assert!(validate_webhook_url("").is_ok());
+    }
+
+    #[test]
+    fn webhook_ssrf_blocked() {
+        assert!(validate_webhook_url("https://localhost/cb").is_err());
+        assert!(validate_webhook_url("https://127.0.0.1/cb").is_err());
+        assert!(validate_webhook_url("https://10.0.0.1/cb").is_err());
+        assert!(validate_webhook_url("https://169.254.169.254/metadata").is_err());
     }
 }

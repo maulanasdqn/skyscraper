@@ -18,7 +18,8 @@ pub async fn create_crawl(
 ) -> ApiResult<(StatusCode, Json<CrawlResponse>)> {
     crate::domain::validation::validate_scrape_url(&body.start_url)?;
 
-    let max_pages = body.max_pages.min(100);
+    let max_pages = body.max_pages.clamp(1, 100);
+    let max_depth = body.max_depth.min(5);
     let crawl_id = uuid::Uuid::new_v4();
     let mut job_ids = Vec::with_capacity(max_pages as usize);
 
@@ -35,7 +36,7 @@ pub async fn create_crawl(
 
     let html = wait_for_html(&state, seed_job.id).await;
     let base = extract_base_url(&body.start_url);
-    let discovered = extract_links(&html, &base, &body.start_url, body.max_depth);
+    let discovered = extract_links(&html, &base, &body.start_url, max_depth);
 
     for url in discovered {
         if job_ids.len() >= max_pages as usize {

@@ -34,7 +34,7 @@ pub async fn retry_dead(
     State(state): State<Arc<AppState>>,
     Query(q): Query<RetryDeadQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let retried = state.queue.retry_dead(q.limit).await?;
+    let retried = state.queue.retry_dead(q.limit.min(1000)).await?;
     Ok(Json(serde_json::json!({ "retried": retried })))
 }
 
@@ -91,13 +91,15 @@ pub async fn list_all_jobs(
     State(state): State<Arc<AppState>>,
     Query(q): Query<AdminJobsQuery>,
 ) -> ApiResult<Json<PaginatedResponse<Job>>> {
-    let offset = (q.page - 1) * q.per_page;
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
     let jobs = state
         .job_repo
-        .list_all(q.status, q.tenant_id, q.per_page, offset)
+        .list_all(q.status, q.tenant_id, per_page, offset)
         .await?;
     let total = state.job_repo.count_all(q.status, q.tenant_id).await?;
     Ok(Json(PaginatedResponse::new(
-        jobs, q.page, q.per_page, total,
+        jobs, page, per_page, total,
     )))
 }

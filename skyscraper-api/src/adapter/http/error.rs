@@ -34,7 +34,10 @@ impl IntoResponse for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "scrape blocked by target site".to_string(),
             ),
-            DomainError::Upstream(msg) => (StatusCode::BAD_GATEWAY, msg.clone()),
+            DomainError::Upstream(msg) => {
+                tracing::warn!("upstream error: {msg}");
+                (StatusCode::BAD_GATEWAY, "upstream service unavailable".to_string())
+            }
             DomainError::Internal(err) => {
                 tracing::error!("internal error: {err:#}");
                 (

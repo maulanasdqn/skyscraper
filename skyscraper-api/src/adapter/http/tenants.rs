@@ -10,7 +10,7 @@ use super::auth::AdminAuth;
 use super::error::ApiResult;
 use super::AppState;
 use crate::domain::entity::{Tenant, TenantPlan};
-use crate::domain::error::DomainError;
+use crate::domain::validation::{validate_email, validate_webhook_url};
 
 #[derive(Debug, Deserialize)]
 pub struct ListQuery {
@@ -90,9 +90,7 @@ pub async fn create_tenant(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateTenantRequest>,
 ) -> ApiResult<Json<TenantCreatedResponse>> {
-    if body.email.is_empty() {
-        return Err(DomainError::InvalidInput("email is required".into()).into());
-    }
+    validate_email(&body.email)?;
     let plan = body.plan.unwrap_or(TenantPlan::Free);
     let tenant = state.tenant_repo.create(&body.email, plan).await?;
     Ok(Json(tenant.into()))
@@ -111,6 +109,7 @@ pub async fn update_tenant(
         state.tenant_repo.set_active(id, active).await?;
     }
     if let Some(ref url) = body.webhook_url {
+        validate_webhook_url(url)?;
         let url_opt = if url.is_empty() {
             None
         } else {

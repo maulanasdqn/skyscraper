@@ -68,13 +68,15 @@ pub async fn create_job(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateJobRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let priority = body.priority.clamp(0, 10);
+    let max_retries = body.max_retries.clamp(0, 10);
     let job = state
         .scrape_service
         .submit_job(
             &tenant.0,
             &body.scrape,
-            body.priority,
-            body.max_retries,
+            priority,
+            max_retries,
             body.scheduled_at,
         )
         .await?;
@@ -98,17 +100,19 @@ pub async fn list_jobs(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListJobsQuery>,
 ) -> ApiResult<Json<PaginatedResponse<Job>>> {
-    let offset = (q.page - 1) * q.per_page;
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
     let jobs = state
         .scrape_service
-        .list_jobs(tenant.0.id, q.status, q.per_page, offset)
+        .list_jobs(tenant.0.id, q.status, per_page, offset)
         .await?;
     let total = state
         .job_repo
         .count_by_tenant(tenant.0.id, q.status)
         .await?;
     Ok(Json(PaginatedResponse::new(
-        jobs, q.page, q.per_page, total,
+        jobs, page, per_page, total,
     )))
 }
 
