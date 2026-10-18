@@ -1,0 +1,101 @@
+use std::borrow::Cow;
+use std::time::Duration;
+
+use chromiumoxide::Page;
+use chromiumoxide::cdp::browser_protocol::emulation::SetFocusEmulationEnabledParams;
+use chromiumoxide::cdp::browser_protocol::network::EnableParams;
+use chromiumoxide::types::{Command, Method, MethodId};
+use serde::Serialize;
+
+use super::super::stealth::StealthConfig;
+
+const LOCAL_HOSTS: [&str; 4] = ["localhost", "127.0.0.1", "0.0.0.0", "[::1]"];
+const LOCAL_HOST_PATTERNS: [&str; 4] = ["localhost", "127.0.0.1", "0.0.0.0", r"\[\:\:1\]"];
+
+const PRIVATE_RANGE_PATTERNS: [&str; 7] = [
+    "10.*.*.*",
+    "172.16.*.*", "172.17.*.*", "172.18.*.*",
+    "192.168.*.*",
+    "169.254.*.*",
+    "100.64.*.*",
+];
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[derive(Debug, Clone, Serialize)]
+struct BlockPattern {
+    #[serde(rename = "urlPattern")]
+    url_pattern: String,
+    block: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SetBlockedUrls {
+    urls: Vec<String>,
+    #[serde(rename = "urlPatterns")]
+    url_patterns: Vec<BlockPattern>,
+}
+
+impl Method for SetBlockedUrls {
+    fn identifier(&self) -> MethodId {
+        Cow::Borrowed("Network.setBlockedURLs")
+    }
+}
+
+impl Command for SetBlockedUrls {
+    type Response = serde_json::Value;
+}
+
+pub(super) async fn block_local_network(page: &Page) {
+    let _ = page.execute(EnableParams::default()).await;
+
+    let mut urls: Vec<String> = LOCAL_HOSTS.iter().map(|h| format!("*://{h}*")).collect();
+    for pattern in &PRIVATE_RANGE_PATTERNS {
+        urls.push(format!("*://{pattern}*"));
+    }
+
+    let mut url_patterns: Vec<BlockPattern> = LOCAL_HOST_PATTERNS
+        .iter()
+        .flat_map(|h| {
+            [format!("*://{h}:*/*"), format!("*://{h}/*")].map(|url_pattern| BlockPattern {
+                url_pattern,
+                block: true,
+            })
+        })
+        .collect();
+    for pattern in &PRIVATE_RANGE_PATTERNS {
+        url_patterns.push(BlockPattern {
+            url_pattern: format!("*://{pattern}:*/*"),
+            block: true,
+        });
+        url_patterns.push(BlockPattern {
+            url_pattern: format!("*://{pattern}/*"),
+            block: true,
+        });
+    }
+
+    let cmd = SetBlockedUrls { urls, url_patterns };
+    if let Err(e) = page.execute(cmd).await {
+        tracing::warn!(error = %e, "local network blocking unavailable");
+    }
+}
+
+pub(super) async fn emulate_focus(page: &Page) {
+    let _ = page
+        .execute(SetFocusEmulationEnabledParams::new(true))
+        .await;
+}
+
+pub(super) async fn is_native_build(page: &Page, cfg: &StealthConfig) -> bool {
+    let probe = "JSON.stringify([navigator.platform, navigator.hardwareConcurrency])";
+    let Ok(Ok(result)) = tokio::time::timeout(PROBE_TIMEOUT, page.evaluate(probe)).await else {
+        return false;
+    };
+    let Ok(raw) = result.into_value::<String>() else {
+        return false;
+    };
+    let expected =
+        serde_json::json!([cfg.navigator_platform, cfg.hardware_concurrency]).to_string();
+    let native = raw == expected;
+    tracing::debug!(native, observed = %raw, "detected cosmium native patches");
+    native
+}

@@ -1,6 +1,25 @@
 /target
+**/target
 .env
 *.swp
 *.swo
 .DS_Store
 dump.rdb
+node_modules
+
+# Cosmium build artifacts
+cosmium/src/
+cosmium/depot_tools/
+cosmium/out/
+cosmium/dist/
+cosmium/.gclient
+cosmium/.gclient_entries
+cosmium/.gclient_previous_sync_commits
+cosmium/.cipd/
+cosmium/.gcs_entries
+cosmium/patches/.scratch/
+cosmium/patches/*.rej
+cosmium/patches/*.orig
+cosmium/graphify-out/
+cosmium/lefthook-local.yml
+cosmium/.claude/

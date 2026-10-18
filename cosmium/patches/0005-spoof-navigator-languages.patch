@@ -1,0 +1,18 @@
+diff --git a/third_party/blink/renderer/core/frame/navigator_language.cc b/third_party/blink/renderer/core/frame/navigator_language.cc
+index 75cd346131..003acfef32 100644
+--- a/third_party/blink/renderer/core/frame/navigator_language.cc
++++ b/third_party/blink/renderer/core/frame/navigator_language.cc
+@@ -84,7 +84,12 @@ void NavigatorLanguage::EnsureUpdatedLanguage() {
+   }
+ 
+   if (languages_dirty_) {
+-    languages_ = ParseAndSanitize(GetAcceptLanguages());
++    const auto* cosmium_cmd = base::CommandLine::ForCurrentProcess();
++    languages_ = ParseAndSanitize(
++        cosmium_cmd->HasSwitch("cosmium-languages")
++            ? String::FromUtf8(
++                  cosmium_cmd->GetSwitchValueASCII("cosmium-languages"))
++            : GetAcceptLanguages());
+     // Reduce the Accept-Language if the ReduceAcceptLanguage deprecation
+     // trial is not enabled and feature flag ReduceAcceptLanguage is enabled.
+     if (RuntimeEnabledFeatures::DisableReduceAcceptLanguageEnabled(

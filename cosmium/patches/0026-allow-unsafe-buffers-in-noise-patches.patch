@@ -1,0 +1,21 @@
+diff --git a/third_party/blink/renderer/platform/graphics/cosmium_canvas_noise.h b/third_party/blink/renderer/platform/graphics/cosmium_canvas_noise.h
+index f02b28598c..e282108e35 100644
+--- a/third_party/blink/renderer/platform/graphics/cosmium_canvas_noise.h
++++ b/third_party/blink/renderer/platform/graphics/cosmium_canvas_noise.h
+@@ -3,6 +3,16 @@
+ // to defeat canvas fingerprinting (DataDome, etc.) while maintaining
+ // visual consistency for the same seed (profile).
+ 
++#ifdef UNSAFE_BUFFERS_BUILD
++// Cosmium: ApplyCanvasNoise walks a Skia pixel buffer by raw pointer, which
++// -Wunsafe-buffer-usage rejects as an error under Chromium's default build
++// config. The bounds come from the caller's own width/height/row_bytes, so the
++// arithmetic is checked by construction rather than by the type system. This
++// is the same escape hatch Chromium applies to its own not-yet-converted
++// graphics code; converting to base::span is the real fix.
++#pragma allow_unsafe_buffers
++#endif
++
+ #ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_GRAPHICS_COSMIUM_CANVAS_NOISE_H_
+ #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_GRAPHICS_COSMIUM_CANVAS_NOISE_H_
+ 

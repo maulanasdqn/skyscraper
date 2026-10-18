@@ -1,0 +1,87 @@
+diff --git a/third_party/blink/renderer/core/frame/screen.cc b/third_party/blink/renderer/core/frame/screen.cc
+index 0fbdd38b94..b40031211a 100644
+--- a/third_party/blink/renderer/core/frame/screen.cc
++++ b/third_party/blink/renderer/core/frame/screen.cc
+@@ -43,6 +43,20 @@
+ 
+ namespace blink {
+ 
++namespace {
++
++// cosmium: read an integer screen dimension from the command line. Returns
++// false when the switch is absent or unparseable so the caller falls through
++// to the real value rather than reporting a zero.
++bool CosmiumScreenInt(const char* switch_name, int* out) {
++  const auto* cosmium_cmd = base::CommandLine::ForCurrentProcess();
++  if (!cosmium_cmd->HasSwitch(switch_name))
++    return false;
++  return base::StringToInt(cosmium_cmd->GetSwitchValueASCII(switch_name), out);
++}
++
++}  // namespace
++
+ Screen::Screen(LocalDOMWindow* window, int64_t display_id)
+     : ExecutionContextClient(window), display_id_(display_id) {}
+ 
+@@ -90,12 +104,18 @@ bool Screen::AreWebExposedScreenPropertiesEqual(
+ }
+ 
+ int Screen::height() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-screen-height", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/false).height();
+ }
+ 
+ int Screen::width() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-screen-width", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/false).width();
+@@ -129,25 +149,42 @@ unsigned Screen::pixelDepth() const {
+   return colorDepth();
+ }
+ 
++// cosmium: the avail* quartet is spoofed alongside width/height on purpose.
++// Reporting a 1920x1080 screen whose available area is still the headless
++// 800x600 is a contradiction no real display produces, and detectors compare
++// the two. The profile carries the pair explicitly -- avail_height 1032 against
++// height 1080 is the Windows 11 taskbar -- so the difference stays plausible.
+ int Screen::availLeft() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-avail-left", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/true).x();
+ }
+ 
+ int Screen::availTop() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-avail-top", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/true).y();
+ }
+ 
+ int Screen::availHeight() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-avail-height", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/true).height();
+ }
+ 
+ int Screen::availWidth() const {
++  int cosmium_value = 0;
++  if (CosmiumScreenInt("cosmium-avail-width", &cosmium_value))
++    return cosmium_value;
+   if (!DomWindow())
+     return 0;
+   return GetRect(/*available=*/true).width();

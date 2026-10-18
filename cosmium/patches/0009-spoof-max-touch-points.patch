@@ -1,0 +1,39 @@
+# cosmium patch: 0009-spoof-max-touch-points
+# Authored: 2026-05-17
+# Chromium base: see ../VERSION
+#
+# Describe the detection vector this patch fixes:
+# - target file(s): third_party/blink/renderer/core/events/navigator_events.cc
+# - what changed: NavigatorEvents::maxTouchPoints consults --cosmium-max-touch-points
+# - profile fields read: hardware.max_touch_points
+# - test: navigator.maxTouchPoints; convertibles + mobile devices must report >= 1
+#         (https://browserleaks.com/javascript)
+diff --git a/third_party/blink/renderer/core/events/navigator_events.cc b/third_party/blink/renderer/core/events/navigator_events.cc
+index a57561775c..636520a858 100644
+--- a/third_party/blink/renderer/core/events/navigator_events.cc
++++ b/third_party/blink/renderer/core/events/navigator_events.cc
+@@ -30,6 +30,8 @@
+ 
+ #include "third_party/blink/renderer/core/events/navigator_events.h"
+ 
++#include "base/command_line.h"
++#include "base/strings/string_number_conversions.h"
+ #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+ #include "third_party/blink/renderer/core/frame/local_frame.h"
+ #include "third_party/blink/renderer/core/frame/navigator.h"
+@@ -38,6 +40,15 @@
+ namespace blink {
+ 
+ int32_t NavigatorEvents::maxTouchPoints(Navigator& navigator) {
++  const auto* cosmium_cmd = base::CommandLine::ForCurrentProcess();
++  if (cosmium_cmd->HasSwitch("cosmium-max-touch-points")) {
++    int cosmium_value = 0;
++    if (base::StringToInt(
++            cosmium_cmd->GetSwitchValueASCII("cosmium-max-touch-points"),
++            &cosmium_value)) {
++      return cosmium_value;
++    }
++  }
+   LocalDOMWindow* window = navigator.DomWindow();
+   return window ? window->GetFrame()->GetSettings()->GetMaxTouchPoints() : 0;
+ }

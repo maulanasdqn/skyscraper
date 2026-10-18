@@ -29,6 +29,33 @@ services:
       retries: 5
     restart: unless-stopped
 
+  cosmium:
+    image: cosmium:cpu
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./cosmium/profiles:/profiles:ro
+    environment:
+      COSMIUM_PROFILE_NAME: ${COSMIUM_PROFILE:-win11_rtx3060_en-us}
+      RUST_LOG: ${COSMIUM_LOG:-info}
+    restart: unless-stopped
+
+  parallax:
+    build:
+      context: parallax
+    ports:
+      - "1080:1080"
+      - "3001:3001"
+    environment:
+      PROXY_LISTEN: "0.0.0.0:1080"
+      PROXY_USER: ${PROXY_USER:-}
+      PROXY_PASS: ${PROXY_PASS:-dev_secret}
+      ROUTES: ${ROUTES:-}
+      RUST_LOG: ${PARALLAX_LOG:-info}
+    restart: unless-stopped
+
   skyscraper-api:
     build:
       context: .
@@ -41,10 +68,10 @@ services:
       API_LISTEN: "0.0.0.0:3002"
       API_ADMIN_KEY: ${API_ADMIN_KEY:-sk_admin_dev}
       PROXY_PASS: ${PROXY_PASS:-dev_secret}
-      PARALLAX_URL: ${PARALLAX_URL:-http://host.docker.internal:3001}
-      PARALLAX_PROXY_HOST: ${PARALLAX_PROXY_HOST:-host.docker.internal}
-      PARALLAX_PROXY_PORT: ${PARALLAX_PROXY_PORT:-1080}
-      COSMIUM_URL: ${COSMIUM_URL:-http://host.docker.internal:3000}
+      PARALLAX_URL: http://parallax:3001
+      PARALLAX_PROXY_HOST: parallax
+      PARALLAX_PROXY_PORT: "1080"
+      COSMIUM_URL: http://cosmium:3000
       CACHE_TTL_SECS: ${CACHE_TTL_SECS:-300}
       RUST_LOG: skyscraper=info
     depends_on:
@@ -52,6 +79,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      cosmium:
+        condition: service_started
+      parallax:
+        condition: service_started
     restart: unless-stopped
 
   skyscraper-worker:
@@ -62,10 +93,10 @@ services:
       DATABASE_URL: postgres://skyscraper:skyscraper@postgres:5432/skyscraper
       REDIS_URL: redis://redis:6379
       PROXY_PASS: ${PROXY_PASS:-dev_secret}
-      PARALLAX_URL: ${PARALLAX_URL:-http://host.docker.internal:3001}
-      PARALLAX_PROXY_HOST: ${PARALLAX_PROXY_HOST:-host.docker.internal}
-      PARALLAX_PROXY_PORT: ${PARALLAX_PROXY_PORT:-1080}
-      COSMIUM_URL: ${COSMIUM_URL:-http://host.docker.internal:3000}
+      PARALLAX_URL: http://parallax:3001
+      PARALLAX_PROXY_HOST: parallax
+      PARALLAX_PROXY_PORT: "1080"
+      COSMIUM_URL: http://cosmium:3000
       COSMIUM_API_KEY: ${COSMIUM_API_KEY:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       CACHE_TTL_SECS: ${CACHE_TTL_SECS:-300}
@@ -76,6 +107,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      cosmium:
+        condition: service_started
+      parallax:
+        condition: service_started
     restart: unless-stopped
 
   skyscraper-ui:

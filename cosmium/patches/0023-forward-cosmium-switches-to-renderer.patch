@@ -1,0 +1,39 @@
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+index 0d96dedc4d..4cdd7a7adf 100644
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -3851,6 +3851,34 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+   // Propagate the following switches to the renderer command line (along
+   // with any associated values) if present in the browser command line.
+   static const char* const kSwitchNames[] = {
++      // cosmium: every spoofing switch below is consumed inside Blink, i.e. in
++      // this renderer, via base::CommandLine::ForCurrentProcess(). Without
++      // being listed here the renderer's command line never carries them,
++      // HasSwitch() is false, and every override silently returns the real
++      // value while the browser process accepts the flag without complaint.
++      "cosmium-platform",
++      "cosmium-languages",
++      "cosmium-hardware-concurrency",
++      "cosmium-device-memory",
++      "cosmium-ua-platform",
++      "cosmium-max-touch-points",
++      "cosmium-color-depth",
++      "cosmium-webgl-vendor",
++      "cosmium-webgl-renderer",
++      "cosmium-audio-base-latency",
++      "cosmium-audio-output-latency",
++      "cosmium-timezone",
++      "cosmium-canvas-seed",
++      "cosmium-battery-charging",
++      "cosmium-battery-level",
++      "cosmium-battery-charging-time",
++      "cosmium-battery-discharging-time",
++      "cosmium-screen-width",
++      "cosmium-screen-height",
++      "cosmium-avail-width",
++      "cosmium-avail-height",
++      "cosmium-avail-left",
++      "cosmium-avail-top",
+       switches::kDisableInProcessStackTraces,
+       sandbox::policy::switches::kDisableLandlockSandbox,
+       sandbox::policy::switches::kDisableSeccompFilterSandbox,

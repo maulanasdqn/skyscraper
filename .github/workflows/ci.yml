@@ -11,8 +11,8 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
-  rust:
-    name: Rust CI
+  skyscraper:
+    name: SkyScraper CI
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -57,8 +57,78 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-skyscraper-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-skyscraper-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  parallax:
+    name: Parallax CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: parallax
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            parallax/target/
+          key: ${{ runner.os }}-parallax-${{ hashFiles('parallax/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-parallax-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  cosmium:
+    name: Cosmium CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cosmium
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            cosmium/target/
+          key: ${{ runner.os }}-cosmium-${{ hashFiles('cosmium/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cosmium-
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -97,7 +167,7 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [rust, ui]
+    needs: [skyscraper, parallax, ui]
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
@@ -110,3 +180,6 @@ jobs:
 
       - name: Build UI image
         run: docker build -f skyscraper-ui/Dockerfile -t skyscraper-ui:ci .
+
+      - name: Build Parallax image
+        run: docker build -f parallax/Dockerfile -t parallax:ci parallax/

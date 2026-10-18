@@ -1,0 +1,25 @@
+diff --git a/third_party/blink/renderer/core/frame/navigator_ua_data.cc b/third_party/blink/renderer/core/frame/navigator_ua_data.cc
+index 36372552ca..e7e17d5ff0 100644
+--- a/third_party/blink/renderer/core/frame/navigator_ua_data.cc
++++ b/third_party/blink/renderer/core/frame/navigator_ua_data.cc
+@@ -62,7 +62,19 @@ void NavigatorUAData::SetMobile(bool mobile) {
+ }
+ 
+ void NavigatorUAData::SetPlatform(const String& brand, const String& version) {
+-  platform_ = brand;
++  // cosmium: override the stored value rather than only the platform()
++  // accessor. getHighEntropyValues() reads the platform_ member directly, so
++  // hooking the accessor alone left navigator.userAgentData.platform spoofed
++  // while getHighEntropyValues(['platform']) still reported the real OS -- a
++  // disagreement between two views of the same hint, which is a stronger
++  // detection signal than either value on its own.
++  const auto* cosmium_cmd = base::CommandLine::ForCurrentProcess();
++  if (cosmium_cmd->HasSwitch("cosmium-ua-platform")) {
++    platform_ = String::FromUtf8(
++        cosmium_cmd->GetSwitchValueASCII("cosmium-ua-platform"));
++  } else {
++    platform_ = brand;
++  }
+   platform_version_ = version;
+ }
+ 

@@ -1,0 +1,92 @@
+# cosmium patch: 0021-spoof-chrome-version-in-ua-headers
+# Authored: 2026-08-08
+# Chromium base: see ../VERSION
+#
+# Describe the detection vector this patch fixes:
+# - target file(s): components/embedder_support/user_agent_utils.cc
+# - what changed: Override the Chrome version reported in User-Agent,
+#                 Sec-CH-UA, Sec-CH-UA-Full-Version-List, and high-entropy
+#                 client hints using --cosmium-chrome-version=<full_version>.
+#                 The framework dylib path and all internal version checks
+#                 stay at the real compiled version to avoid the GPU process
+#                 crash we hit when editing global version headers.
+# - profile fields read: chrome_version (mapped to --cosmium-chrome-version)
+# - test: navigator.userAgent should contain Chrome/<spoofed_major>.0.0.0
+#         Sec-CH-UA should show "Google Chrome";v="<spoofed_major>"
+diff --git a/components/embedder_support/user_agent_utils.cc b/components/embedder_support/user_agent_utils.cc
+index 418015ba2a..5ced816787 100644
+--- a/components/embedder_support/user_agent_utils.cc
++++ b/components/embedder_support/user_agent_utils.cc
+@@ -154,6 +154,26 @@ const std::string& GetWindowsPlatformVersion() {
+ }
+ #endif  // BUILDFLAG(IS_WIN)
+ 
++// Cosmium: Override the Chrome version reported in the User-Agent, Sec-CH-UA
++// and high-entropy client hints so detectors see a current release instead of
++// the compiled one. Only the version numbers emitted to the web change; the
++// framework path and internal version checks stay at the real compiled version.
++//
++// The version is read from --cosmium-chrome-version (passed by the Rust engine
++// from the profile's chrome_version field). Falls back to the real compiled
++// version when the switch is absent.
++static std::string CosmiumSpoofedFullVersion() {
++  const auto* cmd = base::CommandLine::ForCurrentProcess();
++  if (cmd->HasSwitch("cosmium-chrome-version"))
++    return cmd->GetSwitchValueASCII("cosmium-chrome-version");
++  return std::string(version_info::GetVersionNumber());
++}
++static std::string CosmiumSpoofedMajorVersion() {
++  std::string full = CosmiumSpoofedFullVersion();
++  auto dot = full.find('.');
++  return dot != std::string::npos ? full.substr(0, dot) : full;
++}
++
+ const blink::UserAgentBrandList GetUserAgentBrandList(
+     const std::string& major_version,
+     const std::string& full_version,
+@@ -182,8 +202,8 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
+ // GetVersionNumber()
+ const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
+     std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
+-  return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+-                               std::string(version_info::GetVersionNumber()),
++  return GetUserAgentBrandList(CosmiumSpoofedMajorVersion(),
++                               CosmiumSpoofedFullVersion(),
+                                blink::UserAgentBrandVersionType::kMajorVersion,
+                                additional_brand_version);
+ }
+@@ -204,8 +224,8 @@ bool ShouldSendUserAgentUnifiedPlatform() {
+ // GetVersionNumber()
+ const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
+     std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
+-  return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+-                               std::string(version_info::GetVersionNumber()),
++  return GetUserAgentBrandList(CosmiumSpoofedMajorVersion(),
++                               CosmiumSpoofedFullVersion(),
+                                blink::UserAgentBrandVersionType::kFullVersion,
+                                additional_brand_version);
+ }
+@@ -457,11 +477,9 @@ std::string BuildOSCpuInfo(
+ }  // namespace
+ 
+ std::string GetProductAndVersion() {
+-  return base::FeatureList::IsEnabled(
+-             blink::features::kReduceUserAgentMinorVersion)
+-             ? version_info::GetProductNameAndVersionForReducedUserAgent()
+-             : std::string(
+-                   version_info::GetProductNameAndVersionForUserAgent());
++  // Cosmium: report the spoofed major in the reduced form real Chrome sends,
++  // Chrome/<major>.0.0.0, never the unreduced build number.
++  return "Chrome/" + CosmiumSpoofedMajorVersion() + ".0.0.0";
+ }
+ 
+ std::optional<std::string> GetUserAgentFromCommandLine() {
+@@ -688,7 +706,7 @@ blink::UserAgentMetadata GetUserAgentMetadata(bool only_low_entropy_ch) {
+   // High entropy client hints.
+   metadata.brand_full_version_list =
+       GetUserAgentBrandFullVersionListInternal(std::nullopt);
+-  metadata.full_version = std::string(version_info::GetVersionNumber());
++  metadata.full_version = CosmiumSpoofedFullVersion();
+   metadata.architecture = GetCpuArchitecture();
+   metadata.model = BuildModelInfo();
+   metadata.form_factors = GetFormFactorsClientHint(metadata, metadata.mobile);
