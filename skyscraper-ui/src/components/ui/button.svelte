@@ -17,19 +17,19 @@
     children?: Snippet
   } = $props()
 
-  const base = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
+  const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed'
 
   const variants: Record<string, string> = {
-    primary: 'bg-accent text-white hover:bg-accent-hover active:scale-[0.98]',
-    secondary: 'bg-surface-raised text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-default',
-    danger: 'bg-danger/10 text-danger hover:bg-danger/15 border border-danger/15',
-    ghost: 'text-text-muted hover:text-text-secondary hover:bg-surface-raised',
+    primary: 'bg-accent text-white hover:bg-accent-hover shadow-sm shadow-accent/20 active:scale-[0.98] active:shadow-none',
+    secondary: 'bg-surface-overlay text-text-secondary hover:text-text-primary border border-border-default hover:border-border-accent',
+    danger: 'bg-danger/10 text-danger hover:bg-danger/15 border border-danger/20',
+    ghost: 'text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50',
   }
 
   const sizes: Record<string, string> = {
-    sm: 'px-2.5 py-1 text-xs gap-1.5',
+    sm: 'px-2.5 py-1.5 text-xs gap-1.5',
     md: 'px-4 py-2 text-sm gap-2',
-    lg: 'px-6 py-2.5 text-sm gap-2',
+    lg: 'px-5 py-2.5 text-sm gap-2',
   }
 </script>
 

@@ -5,6 +5,7 @@
   import { getJob, cancelJob, retryJob, getScreenshotUrl } from '@lib/api/skyscraper'
   import { formatDate, formatMs, formatBytes } from '@lib/utils/format'
   import { downloadJson, downloadCsv } from '@lib/utils/export'
+  import { highlightJson } from '@lib/utils/highlight'
   import type { Job } from '@lib/types'
 
   let { jobId = '' }: { jobId?: string } = $props()
@@ -16,16 +17,6 @@
 
   let copied = $state(false)
   const TERMINAL = new Set(['completed', 'failed', 'dead'])
-
-  function hl(obj: unknown): string {
-    return JSON.stringify(obj, null, 2)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"([^"]+)":/g, '<span class="text-accent">"$1"</span>:')
-      .replace(/: "([^"]*)"/g, ': <span class="text-success">"$1"</span>')
-      .replace(/: (\d+\.?\d*)/g, ': <span class="text-warning">$1</span>')
-      .replace(/: (true|false)/g, ': <span class="text-info">$1</span>')
-      .replace(/: (null)/g, ': <span class="text-text-muted">$1</span>')
-  }
 
   async function copyResult() {
     if (!job?.result?.extracted) return
@@ -68,7 +59,7 @@
   })
 </script>
 
-<div class="space-y-5">
+<div class="space-y-5 animate-fade-in">
   <div class="flex items-center gap-3">
     <a href="#jobs" class="text-xs text-text-muted hover:text-text-secondary transition-colors">Jobs</a>
     <span class="text-text-muted/50">/</span>
@@ -172,7 +163,7 @@
               class="text-[11px] text-text-muted hover:text-text-secondary transition-colors">CSV</button>
           </div>
         </div>
-        <pre class="p-5 text-xs font-mono overflow-x-auto max-h-96 leading-relaxed">{@html hl(job.result.extracted)}</pre>
+        <pre class="p-5 text-xs font-mono overflow-x-auto max-h-96 leading-relaxed">{@html highlightJson(job.result.extracted)}</pre>
         {#if job.result.screenshot_base64}
           <div class="p-5 border-t border-border-subtle">
             <img src={getScreenshotUrl(job.id)} alt="Screenshot" class="rounded-xl border border-border-subtle max-w-full" />

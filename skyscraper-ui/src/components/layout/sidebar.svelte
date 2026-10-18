@@ -6,6 +6,7 @@
   } = $props()
 
   let mobileOpen = $state(false)
+  let collapsed = $state(false)
 
   type NavItem = { id: string; icon: string; label: string; separator?: boolean }
 
@@ -30,7 +31,7 @@
 </script>
 
 <button
-  class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-surface-raised text-text-secondary"
+  class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-surface-raised/80 backdrop-blur text-text-secondary border border-border-subtle"
   aria-label="Menu"
   onclick={() => (mobileOpen = !mobileOpen)}
 >
@@ -40,55 +41,64 @@
 </button>
 
 {#if mobileOpen}
-  <div class="lg:hidden fixed inset-0 bg-black/60 z-30"
+  <div class="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
     role="button" tabindex="-1"
     onclick={() => (mobileOpen = false)} onkeydown={() => {}}></div>
 {/if}
 
 <aside class="
   fixed lg:static inset-y-0 left-0 z-40
-  w-16 bg-surface border-r border-border-subtle
-  flex flex-col items-center
-  transform transition-transform duration-200
+  {collapsed ? 'w-16' : 'w-52'} bg-surface-sunken
+  flex flex-col
+  border-r border-border-subtle
+  transform transition-all duration-200 ease-out
   {mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
 ">
-  <div class="h-14 flex items-center justify-center border-b border-border-subtle w-full">
-    <a href="#playground" class="w-8 h-8 rounded-xl bg-accent/20 flex items-center justify-center hover:bg-accent/30 transition-colors">
-      <svg class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <div class="h-14 flex items-center gap-2.5 px-4 border-b border-border-subtle shrink-0">
+    <a href="#playground" class="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center hover:bg-accent/25 transition-colors shrink-0">
+      <svg class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M4 20 L12 4 L20 20" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M8 14 L16 14" stroke-linecap="round" />
       </svg>
     </a>
+    {#if !collapsed}
+      <span class="text-sm font-semibold text-text-primary tracking-tight">SkyScraper</span>
+    {/if}
   </div>
 
-  <nav class="flex-1 py-3 flex flex-col items-center gap-0.5 overflow-y-auto w-full px-2">
+  <nav class="flex-1 py-2 px-2 flex flex-col gap-0.5 overflow-y-auto">
     {#each navItems as item}
       {#if item.separator}
-        <div class="w-6 h-px bg-border-subtle my-2"></div>
+        <div class="h-px bg-border-subtle my-2 mx-2"></div>
       {:else}
-        <div class="relative group">
-          <button
-            onclick={() => navigate(item.id)}
-            aria-label={item.label}
-            class="w-10 h-10 flex items-center justify-center rounded-xl transition-all
-              {currentRoute === item.id
-                ? 'bg-accent/15 text-accent'
-                : 'text-text-muted hover:text-text-secondary hover:bg-surface-raised'}"
-          >
-            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d={item.icon} />
-            </svg>
-          </button>
-          <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-surface-overlay text-text-primary text-[11px] rounded-md
-            opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-lg border border-border-subtle">
-            {item.label}
-          </div>
-        </div>
+        <button
+          onclick={() => navigate(item.id)}
+          class="flex items-center gap-2.5 px-2.5 h-9 rounded-lg transition-all text-left w-full
+            {currentRoute === item.id
+              ? 'bg-accent/10 text-accent'
+              : 'text-text-muted hover:text-text-secondary hover:bg-surface-raised/50'}"
+        >
+          <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d={item.icon} />
+          </svg>
+          {#if !collapsed}
+            <span class="text-[13px] font-medium truncate">{item.label}</span>
+          {/if}
+        </button>
       {/if}
     {/each}
   </nav>
 
-  <div class="py-3 border-t border-border-subtle w-full flex justify-center">
-    <div class="w-2 h-2 rounded-full bg-success" title="Online"></div>
+  <div class="px-2 py-2 border-t border-border-subtle shrink-0">
+    <button onclick={() => (collapsed = !collapsed)}
+      class="hidden lg:flex items-center gap-2.5 px-2.5 h-9 rounded-lg w-full text-text-muted hover:text-text-secondary hover:bg-surface-raised/50 transition-all"
+    >
+      <svg class="w-[18px] h-[18px] shrink-0 transition-transform {collapsed ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {#if !collapsed}
+        <span class="text-[13px]">Collapse</span>
+      {/if}
+    </button>
   </div>
 </aside>

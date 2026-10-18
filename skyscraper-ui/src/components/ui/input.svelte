@@ -26,11 +26,11 @@
     {placeholder}
     {disabled}
     bind:value
-    class="w-full rounded-xl border bg-surface-raised px-3.5 py-2 text-sm text-text-primary
-      placeholder-text-muted transition-colors
-      focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent/40
+    class="w-full rounded-lg border bg-surface-raised/50 px-3 py-2 text-sm text-text-primary
+      placeholder-text-muted/60 transition-all
+      focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/30
       disabled:opacity-40 disabled:cursor-not-allowed
-      {error ? 'border-danger/50' : 'border-border-subtle'}"
+      {error ? 'border-danger/40' : 'border-border-default'}"
   />
   {#if error}
     <p class="text-xs text-danger">{error}</p>

@@ -2,6 +2,7 @@
   import StatCard from '@components/ui/stat-card.svelte'
   import Button from '@components/ui/button.svelte'
   import { getAdminKey } from '@lib/stores/auth.svelte'
+  import { showToast } from '@lib/stores/toast.svelte'
   import { getMetrics, getQueueStats, getCacheStats, flushCache, retryDead } from '@lib/api/skyscraper'
   import type { Metrics, QueueStats, CacheStats } from '@lib/types'
   import { formatNumber } from '@lib/utils/format'
@@ -28,12 +29,12 @@
 
   async function handleFlush() {
     const key = getAdminKey()
-    if (key) { await flushCache(key); load() }
+    if (key) { await flushCache(key); showToast('success', 'Cache flushed'); load() }
   }
 
   async function handleRetryDead() {
     const key = getAdminKey()
-    if (key) { const r = await retryDead(key); alert(`Retried ${r.retried} jobs`); load() }
+    if (key) { const r = await retryDead(key); showToast('success', `Retried ${r.retried} jobs`); load() }
   }
 
   function toggleAuto() {
@@ -52,13 +53,13 @@
   )
 </script>
 
-<div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold text-text-primary">Metrics</h1>
+<div class="space-y-4 animate-fade-in">
+  <div class="flex items-center justify-end">
     <div class="flex gap-2">
-      <button class="text-xs text-text-muted hover:text-text-secondary" onclick={load}>Refresh</button>
+      <button class="text-xs text-text-muted hover:text-text-secondary transition-colors" onclick={load}>Refresh</button>
       <button
-        class="text-xs px-2 py-1 rounded {autoRefresh ? 'bg-accent/10 text-accent' : 'text-text-muted hover:text-text-secondary'}"
+        class="text-xs px-2.5 py-1 rounded-lg transition-all
+          {autoRefresh ? 'bg-accent/10 text-accent border border-accent/20' : 'text-text-muted hover:text-text-secondary border border-transparent'}"
         onclick={toggleAuto}>{autoRefresh ? 'Auto ON' : 'Auto OFF'}</button>
     </div>
   </div>

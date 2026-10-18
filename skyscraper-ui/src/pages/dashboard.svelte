@@ -2,6 +2,7 @@
   import StatCard from '@components/ui/stat-card.svelte'
   import Card from '@components/ui/card.svelte'
   import Badge from '@components/ui/badge.svelte'
+  import EmptyState from '@components/ui/empty-state.svelte'
   import { getHealth } from '@lib/api/skyscraper'
   import { getMetrics, getQueueStats, listAllJobs } from '@lib/api/skyscraper'
   import { getCosmiumHealth } from '@lib/api/cosmium'
@@ -40,26 +41,17 @@
     if (m.status === 'fulfilled') metrics = m.value
     if (q.status === 'fulfilled') queue = q.value
     if (jobs.status === 'fulfilled') recentJobs = jobs.value.data
-    if (q.status === 'fulfilled') {
-      rpmUsed = Number(queue?.processing ?? 0) + Number(queue?.pending ?? 0)
-    }
+    if (q.status === 'fulfilled') rpmUsed = Number(queue?.processing ?? 0) + Number(queue?.pending ?? 0)
     skyHealth = h.status === 'fulfilled' ? 'online' : 'offline'
-    try {
-      await getCosmiumHealth(getCosmiumUrl(), getCosmiumApiKey())
-      cosHealth = 'online'
-    } catch { cosHealth = 'offline' }
+    try { await getCosmiumHealth(getCosmiumUrl(), getCosmiumApiKey()); cosHealth = 'online' }
+    catch { cosHealth = 'offline' }
   }
 
   $effect(() => { load() })
 </script>
 
-<div class="space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold text-text-primary">Dashboard</h1>
-    <button class="text-xs text-text-muted hover:text-text-secondary transition-colors" onclick={load}>Refresh</button>
-  </div>
-
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="space-y-5 animate-fade-in">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
     <StatCard label="Jobs Processed" value={metrics?.jobs_processed ?? '—'} icon={icons.processed} />
     <StatCard label="Queue Pending" value={queue?.pending ?? '—'} icon={icons.pending} />
     <StatCard label="Cache Hits" value={metrics?.cache_hits ?? '—'} icon={icons.cache}
@@ -68,7 +60,7 @@
       trend={metrics && metrics.jobs_failed > 0 ? 'down' : 'neutral'} />
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
     <Card title="Services">
       <div class="space-y-3">
         {#each [
@@ -78,7 +70,7 @@
           <div class="flex items-center justify-between">
             <span class="text-sm text-text-secondary">{svc.name}</span>
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full {svc.status === 'online' ? 'bg-success' : 'bg-danger'}"></span>
+              <span class="w-2 h-2 rounded-full {svc.status === 'online' ? 'bg-success' : svc.status === '...' ? 'bg-text-muted animate-pulse' : 'bg-danger'}"></span>
               <span class="text-xs text-text-muted">{svc.status}</span>
             </div>
           </div>
@@ -102,15 +94,15 @@
       </div>
     </Card>
 
-    <Card title="Rate Limits & Webhooks">
+    <Card title="Rate Limits">
       <div class="space-y-3">
         <div>
-          <div class="flex justify-between text-xs mb-1.5">
+          <div class="flex justify-between text-xs mb-2">
             <span class="text-text-muted">RPM Usage</span>
             <span class="text-text-secondary tabular-nums">{rpmUsed} / {rpmLimit}</span>
           </div>
           <div class="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
-            <div class="h-full rounded-full bg-accent transition-all" style="width: {Math.min((rpmUsed / rpmLimit) * 100, 100)}%"></div>
+            <div class="h-full rounded-full bg-gradient-to-r from-accent to-accent-hover transition-all" style="width: {Math.min((rpmUsed / rpmLimit) * 100, 100)}%"></div>
           </div>
         </div>
         <div class="flex justify-between text-xs">
@@ -119,28 +111,29 @@
         </div>
         <div class="flex justify-between text-xs">
           <span class="text-text-muted">Webhook Failures</span>
-          <span class="{(metrics?.webhook_failures ?? 0) > 0 ? 'text-danger' : 'text-text-secondary'} tabular-nums">{metrics?.webhook_failures ?? 0}</span>
+          <span class="{(metrics?.webhook_failures ?? 0) > 0 ? 'text-danger' : 'text-text-muted'} tabular-nums">{metrics?.webhook_failures ?? 0}</span>
         </div>
       </div>
     </Card>
   </div>
 
-  <Card title="Recent Jobs">
+  <Card title="Recent Jobs" noPadding>
     {#if recentJobs.length === 0}
-      <p class="text-sm text-text-muted">No jobs yet. Start scraping from the Playground.</p>
+      <EmptyState title="No jobs yet" description="Start scraping from the Playground"
+        icon="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     {:else}
-      <div class="overflow-x-auto -mx-5 -mb-5">
+      <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
             <tr class="border-b border-border-subtle">
               {#each ['URL', 'Status', 'Duration', 'Created'] as h}
-                <th class="text-left text-[11px] text-text-muted uppercase tracking-wider px-5 pb-3">{h}</th>
+                <th class="text-left text-[11px] text-text-muted uppercase tracking-wider px-5 pb-3 pt-4 font-medium">{h}</th>
               {/each}
             </tr>
           </thead>
           <tbody>
             {#each recentJobs as job}
-              <tr class="border-b border-border-subtle/40 hover:bg-surface-raised/40 cursor-pointer transition-colors"
+              <tr class="border-b border-border-subtle/30 hover:bg-surface-raised/30 cursor-pointer transition-colors"
                   onclick={() => window.location.hash = `jobs/${job.id}`}>
                 <td class="px-5 py-3 text-sm text-text-secondary">{truncateUrl(job.request.url, 50)}</td>
                 <td class="px-5 py-3"><Badge text={job.status} color={statusColor[job.status] ?? 'gray'} /></td>

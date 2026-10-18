@@ -80,12 +80,7 @@
   function onKey(e: KeyboardEvent) { if (e.key === 'Enter' && canSubmit) submit() }
 </script>
 
-<div class="space-y-5">
-  <div>
-    <h1 class="text-xl font-bold text-text-primary">Playground</h1>
-    <p class="text-sm text-text-muted mt-1">Scrape any URL with anti-detection browser</p>
-  </div>
-
+<div class="space-y-5 animate-fade-in">
   <div class="rounded-xl border border-border-subtle bg-surface">
     <div class="flex items-center gap-2 px-4 pt-3">
       <div class="flex gap-0.5 bg-surface-overlay/50 rounded-lg p-0.5">

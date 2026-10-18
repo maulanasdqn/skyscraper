@@ -11,7 +11,7 @@
   } = $props()
 </script>
 
-<div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
+<div class="rounded-xl border border-border-subtle bg-surface overflow-hidden animate-fade-in">
   <div class="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
     <div class="flex items-center gap-3 text-sm">
       <span class="w-1.5 h-1.5 rounded-full bg-success"></span>

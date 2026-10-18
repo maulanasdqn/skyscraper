@@ -1,18 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #12121a;
-  --color-surface-raised: #1a1a24;
-  --color-surface-overlay: #22222e;
-  --color-border-subtle: #2a2a3a;
-  --color-border-default: #35354a;
-  --color-text-primary: #e8e8f0;
-  --color-text-secondary: #9495a8;
-  --color-text-muted: #5c5d74;
+  --color-surface: #101018;
+  --color-surface-raised: #16161f;
+  --color-surface-overlay: #1e1e2a;
+  --color-surface-sunken: #0a0a10;
+  --color-border-subtle: #ffffff08;
+  --color-border-default: #ffffff12;
+  --color-border-accent: #a78bfa30;
+  --color-text-primary: #ededf0;
+  --color-text-secondary: #a0a0b0;
+  --color-text-muted: #5a5a6e;
   --color-accent: #a78bfa;
   --color-accent-hover: #8b5cf6;
-  --color-accent-muted: rgba(167, 139, 250, 0.1);
-  --color-accent-soft: rgba(167, 139, 250, 0.06);
+  --color-accent-muted: rgba(167, 139, 250, 0.10);
+  --color-accent-soft: rgba(167, 139, 250, 0.05);
   --color-success: #34d399;
   --color-warning: #fbbf24;
   --color-danger: #f87171;
@@ -20,17 +22,47 @@
 }
 
 body {
-  background: #0c0c14;
+  background: #09090f;
   color: var(--color-text-primary);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::selection {
-  background: rgba(167, 139, 250, 0.3);
-}
+::selection { background: rgba(167, 139, 250, 0.3); }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
+::-webkit-scrollbar-thumb { background: #ffffff10; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ffffff18; }
+
+code, pre, .font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(-8px) scale(0.96); } }
+
+.animate-fade-in { animation: fade-in 0.3s ease-out both; }
+.animate-fade-up { animation: fade-up 0.4s ease-out both; }
+.animate-slide-in-right { animation: slide-in-right 0.25s ease-out both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--color-surface-raised) 25%, var(--color-surface-overlay) 50%, var(--color-surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.animate-toast-in { animation: toast-in 0.25s ease-out both; }
+.animate-toast-out { animation: toast-out 0.2s ease-in both; }
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }

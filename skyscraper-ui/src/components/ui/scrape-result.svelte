@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatMs, formatBytes } from '@lib/utils/format'
   import { downloadJson, downloadCsv } from '@lib/utils/export'
+  import { highlightJson, highlightHtml } from '@lib/utils/highlight'
   import type { ScrapeResult } from '@lib/types'
 
   let {
@@ -30,23 +31,6 @@
     else if (hasExtracted) tab = 'extracted'
     else tab = 'meta'
   })
-
-  function hl(obj: unknown): string {
-    return JSON.stringify(obj, null, 2)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"([^"]+)":/g, '<span class="text-accent">"$1"</span>:')
-      .replace(/: "([^"]*)"/g, ': <span class="text-success">"$1"</span>')
-      .replace(/: (\d+\.?\d*)/g, ': <span class="text-warning">$1</span>')
-      .replace(/: (true|false)/g, ': <span class="text-info">$1</span>')
-      .replace(/: (null)/g, ': <span class="text-text-muted">$1</span>')
-  }
-
-  function hlHtml(raw: string): string {
-    const t = raw.length > 50000 ? raw.slice(0, 50000) + '\n...' : raw
-    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/&lt;(\/?)([\w-]+)/g, '&lt;$1<span class="text-accent">$2</span>')
-      .replace(/ ([\w-]+)="/g, ' <span class="text-warning">$1</span>="')
-  }
 
   async function copyResult() {
     const data = tab === 'ai' ? aiResult?.data : tab === 'extracted' ? scrape.extracted : tab === 'html' ? scrape.html : null
@@ -143,7 +127,7 @@
         <div class="absolute top-2.5 right-3 flex items-center gap-2 z-10">
           {#if aiResult.model}<span class="text-[10px] text-text-muted bg-surface/80 px-1.5 py-0.5 rounded">{aiResult.model}</span>{/if}
         </div>
-        <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html hl(aiResult.data)}</pre>
+        <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html highlightJson(aiResult.data)}</pre>
       {/if}
     {:else if tab === 'meta'}
       <div class="p-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -162,9 +146,9 @@
         {/each}
       </div>
     {:else if tab === 'extracted'}
-      <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html hl(scrape.extracted)}</pre>
+      <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html highlightJson(scrape.extracted)}</pre>
     {:else if tab === 'html'}
-      <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html hlHtml(scrape.html ?? '')}</pre>
+      <pre class="p-4 text-xs overflow-auto font-mono leading-relaxed max-h-[500px]">{@html highlightHtml(scrape.html ?? '')}</pre>
     {:else if tab === 'render'}
       <iframe
         srcdoc={scrape.html ?? ''}

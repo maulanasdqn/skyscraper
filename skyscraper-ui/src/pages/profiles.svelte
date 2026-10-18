@@ -3,7 +3,10 @@
   import Button from '@components/ui/button.svelte'
   import Input from '@components/ui/input.svelte'
   import Modal from '@components/ui/modal.svelte'
+  import EmptyState from '@components/ui/empty-state.svelte'
   import { getCosmiumUrl, getCosmiumApiKey } from '@lib/stores/auth.svelte'
+  import { showToast } from '@lib/stores/toast.svelte'
+  import { highlightJson } from '@lib/utils/highlight'
   import {
     getCosmiumHealth, listProfiles, getProfile, deleteProfile,
     generateProfile, runFingerprintTest, runStealthTest,
@@ -44,6 +47,7 @@
     if (!confirm(`Delete "${name}"?`)) return
     await deleteProfile(getCosmiumUrl(), name, getCosmiumApiKey())
     selected = null; load()
+    showToast('success', `Profile "${name}" deleted`)
   }
 
   async function handleGenerate() {
@@ -51,7 +55,8 @@
     try {
       await generateProfile(getCosmiumUrl(), genPersona, genName, getCosmiumApiKey())
       showGenerate = false; genName = ''; genPersona = ''; load()
-    } catch (e) { error = e instanceof Error ? e.message : 'Generation failed' }
+      showToast('success', 'Profile generated')
+    } catch (e) { showToast('error', e instanceof Error ? e.message : 'Generation failed') }
     genLoading = false
   }
 
@@ -66,15 +71,12 @@
   $effect(() => { load() })
 </script>
 
-<div class="space-y-4">
+<div class="space-y-4 animate-fade-in">
   <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-bold text-text-primary">Profiles</h1>
+    <div class="flex items-center gap-2">
       {#if health}
-        <div class="flex items-center gap-2 mt-1">
-          <Badge text={health.status === 'ok' ? 'connected' : 'error'} color={health.status === 'ok' ? 'green' : 'red'} />
-          {#if health.llm_configured}<Badge text="AI" color="purple" />{/if}
-        </div>
+        <Badge text={health.status === 'ok' ? 'connected' : 'error'} color={health.status === 'ok' ? 'green' : 'red'} />
+        {#if health.llm_configured}<Badge text="AI" color="purple" />{/if}
       {/if}
     </div>
     <div class="flex gap-2">
@@ -88,19 +90,25 @@
 
   <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
     <div class="lg:col-span-2 rounded-xl border border-border-subtle bg-surface overflow-hidden">
-      <div class="px-4 py-2.5 border-b border-border-subtle">
+      <div class="px-5 py-3 border-b border-border-subtle">
         <span class="text-xs text-text-muted">{profiles.length} profiles</span>
       </div>
       {#if loading}
-        <div class="p-4 text-sm text-text-muted">Loading...</div>
+        <div class="p-6 text-center">
+          <svg class="animate-spin h-5 w-5 mx-auto text-accent" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
       {:else if profiles.length === 0}
-        <div class="p-4 text-sm text-text-muted">No profiles</div>
+        <EmptyState icon="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          title="No profiles" description="Generate one to get started" />
       {:else}
         <div class="max-h-80 overflow-y-auto">
           {#each profiles as name}
             <button
-              class="w-full text-left px-4 py-2 text-sm border-b border-border-subtle/50 transition-colors
-                {selected?.name === name ? 'bg-accent-muted text-accent' : 'text-text-secondary hover:bg-surface-raised'}"
+              class="w-full text-left px-5 py-2.5 text-sm border-b border-border-subtle/50 transition-colors
+                {selected?.name === name ? 'bg-accent-muted text-accent' : 'text-text-secondary hover:bg-surface-raised/50'}"
               onclick={() => viewProfile(name)}>
               {name}
             </button>
@@ -111,24 +119,24 @@
 
     <div class="lg:col-span-3 rounded-xl border border-border-subtle bg-surface overflow-hidden">
       {#if selected}
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
-          <span class="text-sm text-text-secondary font-medium">{selected.name}</span>
-          <button class="text-xs text-danger hover:underline" onclick={() => handleDelete(selected!.name)}>Delete</button>
+        <div class="flex items-center justify-between px-5 py-3 border-b border-border-subtle">
+          <span class="text-sm text-text-primary font-medium">{selected.name}</span>
+          <button class="text-xs text-danger hover:text-danger/80 transition-colors" onclick={() => handleDelete(selected!.name)}>Delete</button>
         </div>
-        <pre class="p-4 text-xs text-text-secondary font-mono overflow-auto max-h-80 leading-relaxed">{JSON.stringify(selected.data, null, 2)}</pre>
+        <pre class="p-5 text-xs text-text-secondary font-mono overflow-auto max-h-80 leading-relaxed">{@html highlightJson(selected.data)}</pre>
       {:else}
-        <div class="p-8 text-center text-sm text-text-muted">Select a profile</div>
+        <EmptyState icon="M15 12a3 3 0 11-6 0 3 3 0 016 0z" title="Select a profile" description="Choose a profile from the list to view its configuration" />
       {/if}
     </div>
   </div>
 
   {#if testResult}
-    <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
+    <div class="rounded-xl border border-border-subtle bg-surface overflow-hidden animate-fade-in">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-border-subtle">
         <span class="text-xs text-text-muted uppercase tracking-wider">Test Result</span>
-        <button class="text-xs text-text-muted hover:text-text-secondary" onclick={() => (testResult = null)}>Dismiss</button>
+        <button class="text-xs text-text-muted hover:text-text-secondary transition-colors" onclick={() => (testResult = null)}>Dismiss</button>
       </div>
-      <pre class="p-4 text-xs text-text-secondary font-mono overflow-auto max-h-60 leading-relaxed">{JSON.stringify(testResult, null, 2)}</pre>
+      <pre class="p-5 text-xs text-text-secondary font-mono overflow-auto max-h-60 leading-relaxed">{@html highlightJson(testResult)}</pre>
     </div>
   {/if}
 </div>
