@@ -1,3 +1,5 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tracing::{error, info, warn};
@@ -6,10 +8,11 @@ use uuid::Uuid;
 use crate::domain::entity::{Job, ScrapeJobRequest, ScrapeJobResult};
 use crate::domain::error::DomainError;
 use crate::domain::job_status::JobStatus;
+use crate::infrastructure::content_validator;
 
 use super::worker::Worker;
 
-const JOB_TIMEOUT: Duration = Duration::from_mins(2);
+const JOB_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Worker {
     pub(super) fn backoff_delay_secs(attempts: i32) -> f64 {
@@ -113,6 +116,7 @@ impl Worker {
         job: &Job,
         request: &ScrapeJobRequest,
     ) -> Result<(), DomainError> {
+        let cache_key = compute_cache_key(request);
         let proxy_url = self.proxy_selector.select_proxy(request).await?;
         let profile = self.profile_rotator.select_profile(request).await?;
 
@@ -130,7 +134,7 @@ impl Worker {
         } else {
             self.metrics.jobs_timed_out.fetch_add(1, Ordering::Relaxed);
             warn!("job {job_id} timed out after {}s", JOB_TIMEOUT.as_secs());
-            let _ = self.dedup.release(&request.url).await;
+            let _ = self.dedup.release(&cache_key).await;
             Err(DomainError::Upstream(format!(
                 "job timed out after {}s",
                 JOB_TIMEOUT.as_secs()
@@ -139,11 +143,24 @@ impl Worker {
 
         match scrape_result {
             Ok(result) => {
-                self.on_scrape_success(job_id, job, request, &result)
-                    .await?;
+                let validation = content_validator::validate(&result);
+                if validation.is_valid {
+                    self.on_scrape_success(job_id, job, &cache_key, &result)
+                        .await?;
+                } else {
+                    let reason = validation.reason.unwrap_or_default();
+                    warn!("job {job_id} soft-blocked: {reason}");
+                    let _ = self.dedup.release(&cache_key).await;
+                    if let Some(ref proxy) = proxy_url {
+                        self.proxy_selector.report_proxy_failure(proxy).await;
+                    }
+                    self.profile_rotator.report_profile_failure(&profile).await;
+                    self.handle_failure(job_id, job, &format!("soft block: {reason}"))
+                        .await?;
+                }
             }
             Err(DomainError::ScrapeBlocked) => {
-                let _ = self.dedup.release(&request.url).await;
+                let _ = self.dedup.release(&cache_key).await;
                 if let Some(ref proxy) = proxy_url {
                     self.proxy_selector.report_proxy_failure(proxy).await;
                 }
@@ -152,7 +169,7 @@ impl Worker {
                     .await?;
             }
             Err(e) => {
-                let _ = self.dedup.release(&request.url).await;
+                let _ = self.dedup.release(&cache_key).await;
                 self.handle_failure(job_id, job, &e.to_string()).await?;
             }
         }
@@ -164,7 +181,7 @@ impl Worker {
         &self,
         job_id: Uuid,
         job: &Job,
-        request: &ScrapeJobRequest,
+        cache_key: &str,
         result: &ScrapeJobResult,
     ) -> Result<(), DomainError> {
         let bytes = result.html_length as i64;
@@ -174,14 +191,27 @@ impl Worker {
         self.metrics.record_job_completed(result.elapsed_ms);
         info!("job {job_id} completed in {}ms", result.elapsed_ms);
 
-        if let Err(e) = self.response_cache.set(&request.url, result, None).await {
-            warn!("failed to cache result for {}: {e}", request.url);
+        if let Err(e) = self.response_cache.set(cache_key, result, None).await {
+            warn!("failed to cache result for {cache_key}: {e}");
         }
-        let _ = self.dedup.release(&request.url).await;
+        let _ = self.dedup.release(cache_key).await;
 
         self.deliver_webhook(job.tenant_id, job_id, Some(result), None)
             .await;
         Ok(())
+    }
+}
+
+pub(super) fn compute_cache_key(request: &ScrapeJobRequest) -> String {
+    let mut hasher = DefaultHasher::new();
+    request.extract.hash(&mut hasher);
+    request.script.hash(&mut hasher);
+    request.screenshot.hash(&mut hasher);
+    let hash = hasher.finish();
+    if hash == DefaultHasher::new().finish() {
+        request.url.clone()
+    } else {
+        format!("{}#{:x}", request.url, hash)
     }
 }
 

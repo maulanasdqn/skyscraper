@@ -86,7 +86,8 @@ async fn main() -> Result<()> {
     let webhook = Arc::new(WebhookDelivery::new());
 
     let parallax_client: Arc<ParallaxClient> = Arc::new(ParallaxClient::new(&parallax_url));
-    let cosmium_client: Arc<CosmiumClient> = Arc::new(CosmiumClient::new(&cosmium_url, cosmium_api_key));
+    let cosmium_client: Arc<CosmiumClient> =
+        Arc::new(CosmiumClient::new(&cosmium_url, cosmium_api_key));
 
     let proxy_selector: Arc<dyn ProxySelection> = Arc::new(ProxySelector::new(
         parallax_client,
@@ -99,40 +100,31 @@ async fn main() -> Result<()> {
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    info!(
-        "starting {concurrency} workers (cache TTL: {cache_ttl}s, domain limit: {domain_max_rpm} rpm)"
-    );
+    info!("starting worker (concurrency={concurrency}, cache TTL={cache_ttl}s, domain limit={domain_max_rpm} rpm)");
 
-    let mut handles = Vec::new();
-    for i in 0..concurrency {
-        let worker = Worker::new(
-            queue.clone(),
-            job_repo.clone(),
-            tenant_repo.clone(),
-            usage_repo.clone(),
-            proxy_selector.clone(),
-            profile_rotator.clone(),
-            cosmium_client.clone(),
-            response_cache.clone(),
-            dedup.clone(),
-            domain_throttle.clone(),
-            metrics.clone(),
-            webhook.clone(),
-            shutdown_rx.clone(),
-        );
-        handles.push(tokio::spawn(async move {
-            info!("worker {i} started");
-            worker.run().await;
-        }));
-    }
+    let worker = Arc::new(Worker::new(
+        queue,
+        job_repo,
+        tenant_repo,
+        usage_repo,
+        proxy_selector,
+        profile_rotator,
+        cosmium_client,
+        response_cache,
+        dedup,
+        domain_throttle,
+        metrics.clone(),
+        webhook,
+        concurrency,
+        shutdown_rx,
+    ));
+
+    let handle = tokio::spawn(async move { worker.run().await });
 
     tokio::signal::ctrl_c().await?;
-    info!("shutting down workers...");
+    info!("shutting down...");
     let _ = shutdown_tx.send(true);
-
-    for handle in handles {
-        let _ = handle.await;
-    }
+    let _ = handle.await;
 
     let snap = metrics.snapshot();
     info!(
@@ -140,6 +132,6 @@ async fn main() -> Result<()> {
         snap.jobs_processed, snap.jobs_failed, snap.cache_hits, snap.dedup_coalesced
     );
 
-    info!("all workers stopped");
+    info!("worker stopped");
     Ok(())
 }

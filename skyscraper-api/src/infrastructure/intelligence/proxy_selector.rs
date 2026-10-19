@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -9,12 +10,14 @@ use crate::domain::entity::{ProxyStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
 use crate::domain::port::{CarrierClient, ProxySelection};
 
+const FAILURE_WINDOW: Duration = Duration::from_secs(30 * 60);
+
 pub struct ProxySelector {
     carrier_client: Arc<dyn CarrierClient>,
     proxy_host: String,
     proxy_port: u16,
     proxy_pass: String,
-    failure_tracker: Arc<RwLock<HashMap<String, u32>>>,
+    failure_tracker: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
 }
 
 impl ProxySelector {
@@ -49,42 +52,60 @@ impl ProxySelector {
                 }
                 Ok(Some(self.build_proxy_url(&carrier.name)))
             }
-            ProxyStrategy::Auto => {
-                let carriers = self.carrier_client.list_carriers().await.unwrap_or_default();
-                let online: Vec<_> = carriers.iter().filter(|c| c.online).collect();
-                if online.is_empty() {
-                    return Ok(None);
-                }
+            ProxyStrategy::Auto => self.select_auto(request).await,
+        }
+    }
 
-                let geo_filtered: Vec<_> = if let Some(ref geo) = request.geo {
-                    let filtered: Vec<_> = online
-                        .iter()
-                        .filter(|c| c.country.eq_ignore_ascii_case(geo))
-                        .collect();
-                    if filtered.is_empty() {
-                        online.iter().collect()
-                    } else {
-                        filtered
-                    }
-                } else {
-                    online.iter().collect()
-                };
+    async fn select_auto(
+        &self,
+        request: &ScrapeJobRequest,
+    ) -> Result<Option<String>, DomainError> {
+        let carriers = self.carrier_client.list_carriers().await.unwrap_or_default();
+        let online: Vec<_> = carriers.iter().filter(|c| c.online).collect();
+        if online.is_empty() {
+            return Ok(None);
+        }
 
-                let failures = self.failure_tracker.read().await;
-                let mut best = geo_filtered[0];
-                let mut best_failures = failures.get(&best.name).copied().unwrap_or(0);
+        let geo_filtered: Vec<_> = if let Some(ref geo) = request.geo {
+            let filtered: Vec<_> = online
+                .iter()
+                .filter(|c| c.country.eq_ignore_ascii_case(geo))
+                .collect();
+            if filtered.is_empty() {
+                online.iter().collect()
+            } else {
+                filtered
+            }
+        } else {
+            online.iter().collect()
+        };
 
-                for carrier in &geo_filtered[1..] {
-                    let f = failures.get(&carrier.name).copied().unwrap_or(0);
-                    if f < best_failures {
-                        best = carrier;
-                        best_failures = f;
-                    }
-                }
+        let now = Instant::now();
+        let mut failures = self.failure_tracker.write().await;
+        failures.retain(|_, ts| {
+            ts.retain(|t| now.duration_since(*t) < FAILURE_WINDOW);
+            !ts.is_empty()
+        });
 
-                Ok(Some(self.build_proxy_url(&best.name)))
+        let weights: Vec<f64> = geo_filtered
+            .iter()
+            .map(|c| {
+                let f = failures.get(&c.name).map_or(0, Vec::len);
+                1.0 / (1.0 + f as f64)
+            })
+            .collect();
+
+        let total: f64 = weights.iter().sum();
+        let pick = rand::random_range(0.0..total);
+        let mut cumulative = 0.0;
+        for (i, w) in weights.iter().enumerate() {
+            cumulative += w;
+            if pick < cumulative {
+                return Ok(Some(self.build_proxy_url(&geo_filtered[i].name)));
             }
         }
+
+        Ok(Some(self.build_proxy_url(&geo_filtered[0].name)))
     }
 
     fn build_proxy_url(&self, carrier_name: &str) -> String {
@@ -101,7 +122,9 @@ impl ProxySelector {
             .and_then(|s| s.split('-').next())
         {
             let mut map = self.failure_tracker.write().await;
-            *map.entry(carrier.to_string()).or_insert(0) += 1;
+            map.entry(carrier.to_string())
+                .or_default()
+                .push(Instant::now());
         }
     }
 }

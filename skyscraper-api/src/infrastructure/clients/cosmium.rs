@@ -30,7 +30,7 @@ impl CosmiumClient {
     pub fn new(base_url: &str, api_key: Option<String>) -> Self {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(90))
+            .timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)
             .pool_idle_timeout(Duration::from_secs(30))
             .tcp_keepalive(Duration::from_secs(15))

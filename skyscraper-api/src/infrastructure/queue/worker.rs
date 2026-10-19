@@ -1,7 +1,7 @@
 use chrono::Utc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::sync::watch;
+use tokio::sync::{watch, Semaphore};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -31,6 +31,7 @@ pub struct Worker {
     pub(super) domain_throttle: Arc<DomainThrottle>,
     pub(super) metrics: Arc<MetricsCollector>,
     pub(super) webhook: Arc<WebhookDelivery>,
+    concurrency: usize,
     shutdown_rx: watch::Receiver<bool>,
 }
 
@@ -49,6 +50,7 @@ impl Worker {
         domain_throttle: Arc<DomainThrottle>,
         metrics: Arc<MetricsCollector>,
         webhook: Arc<WebhookDelivery>,
+        concurrency: usize,
         shutdown_rx: watch::Receiver<bool>,
     ) -> Self {
         Self {
@@ -64,31 +66,61 @@ impl Worker {
             domain_throttle,
             metrics,
             webhook,
+            concurrency,
             shutdown_rx,
         }
     }
 
-    pub async fn run(&self) {
-        info!("worker started");
-        let mut last_maintenance = tokio::time::Instant::now();
-        let maintenance_interval = std::time::Duration::from_secs(5);
+    pub async fn run(self: Arc<Self>) {
+        info!(concurrency = self.concurrency, "worker started");
+
+        let semaphore = Arc::new(Semaphore::new(self.concurrency));
+
+        let maint = Arc::clone(&self);
+        let mut maint_shutdown = self.shutdown_rx.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => maint.run_maintenance().await,
+                    _ = maint_shutdown.changed() => break,
+                }
+            }
+        });
+
         loop {
             if *self.shutdown_rx.borrow() {
-                info!("worker shutting down");
+                info!("worker shutting down, waiting for in-flight jobs");
+                let _ = semaphore
+                    .acquire_many(self.concurrency as u32)
+                    .await;
+                info!("all in-flight jobs finished");
                 break;
             }
-            if last_maintenance.elapsed() >= maintenance_interval {
-                self.run_maintenance().await;
-                last_maintenance = tokio::time::Instant::now();
-            }
-            match self.queue.dequeue(5.0).await {
-                Ok(Some(job_id)) => {
-                    if let Err(e) = self.process_job(job_id).await {
-                        error!("job {job_id} processing error: {e}");
-                    }
+
+            let permit = match semaphore.clone().try_acquire_owned() {
+                Ok(p) => p,
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    continue;
                 }
-                Ok(None) => {}
+            };
+
+            match self.queue.dequeue(2.0).await {
+                Ok(Some(job_id)) => {
+                    let worker = Arc::clone(&self);
+                    tokio::spawn(async move {
+                        if let Err(e) = worker.process_job(job_id).await {
+                            error!("job {job_id} processing error: {e}");
+                        }
+                        drop(permit);
+                    });
+                }
+                Ok(None) => {
+                    drop(permit);
+                }
                 Err(e) => {
+                    drop(permit);
                     error!("dequeue error: {e}");
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
@@ -131,7 +163,9 @@ impl Worker {
             serde_json::from_value(job.request.clone())
                 .map_err(|e| DomainError::InvalidInput(format!("malformed job request: {e}")))?;
 
-        if let Ok(Some(cached)) = self.response_cache.get(&request.url).await {
+        let cache_key = super::worker_exec::compute_cache_key(&request);
+
+        if let Ok(Some(cached)) = self.response_cache.get(&cache_key).await {
             info!("job {job_id} served from cache");
             return self.complete_from_cache(job_id, &job, &cached).await;
         }
@@ -148,12 +182,12 @@ impl Worker {
             return Ok(());
         }
 
-        let acquired = self.dedup.try_acquire(&request.url).await.unwrap_or(true);
+        let acquired = self.dedup.try_acquire(&cache_key).await.unwrap_or(true);
         if !acquired {
             self.metrics.dedup_coalesced.fetch_add(1, Ordering::Relaxed);
             if let Ok(Some(result)) = self
                 .dedup
-                .wait_for_result(&request.url, self.response_cache.as_ref())
+                .wait_for_result(&cache_key, self.response_cache.as_ref())
                 .await
             {
                 info!("job {job_id} coalesced from in-flight result");

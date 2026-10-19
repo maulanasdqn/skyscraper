@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 use async_trait::async_trait;
@@ -9,10 +10,12 @@ use crate::domain::entity::{ProfileStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
 use crate::domain::port::{ProfileSelection, ScrapeClient};
 
+const BLOCK_TTL: Duration = Duration::from_secs(30 * 60);
+
 pub struct ProfileRotator {
     scrape_client: Arc<dyn ScrapeClient>,
     counter: AtomicUsize,
-    blocked_profiles: Arc<RwLock<HashSet<String>>>,
+    blocked_profiles: Arc<RwLock<HashMap<String, Instant>>>,
 }
 
 impl ProfileRotator {
@@ -20,7 +23,7 @@ impl ProfileRotator {
         Self {
             scrape_client,
             counter: AtomicUsize::new(0),
-            blocked_profiles: Arc::new(RwLock::new(HashSet::new())),
+            blocked_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -35,33 +38,34 @@ impl ProfileRotator {
                 let idx = rand::random_range(0..profiles.len());
                 Ok(profiles[idx].clone())
             }
-            ProfileStrategy::Auto => {
-                let profiles = self.scrape_client.list_profiles().await?;
-                if profiles.is_empty() {
-                    return Err(DomainError::Upstream("no profiles available".into()));
-                }
-
-                let blocked = self.blocked_profiles.read().await;
-                let available: Vec<_> = profiles.iter().filter(|p| !blocked.contains(*p)).collect();
-
-                let pool = if available.is_empty() {
-                    &profiles
-                } else {
-                    // SAFETY: available is Vec<&String>, we need &[String]
-                    // Use the index approach instead
-                    let idx = self.counter.fetch_add(1, Ordering::Relaxed) % available.len();
-                    return Ok(available[idx].clone());
-                };
-
-                let idx = self.counter.fetch_add(1, Ordering::Relaxed) % pool.len();
-                Ok(pool[idx].clone())
-            }
+            ProfileStrategy::Auto => self.select_auto().await,
         }
     }
 
+    async fn select_auto(&self) -> Result<String, DomainError> {
+        let profiles = self.scrape_client.list_profiles().await?;
+        if profiles.is_empty() {
+            return Err(DomainError::Upstream("no profiles available".into()));
+        }
+
+        let now = Instant::now();
+        let mut blocked = self.blocked_profiles.write().await;
+        blocked.retain(|_, ts| now.duration_since(*ts) < BLOCK_TTL);
+
+        let available: Vec<_> = profiles.iter().filter(|p| !blocked.contains_key(*p)).collect();
+
+        let pool = if available.is_empty() { &profiles } else {
+            let idx = self.counter.fetch_add(1, Ordering::Relaxed) % available.len();
+            return Ok(available[idx].clone());
+        };
+
+        let idx = self.counter.fetch_add(1, Ordering::Relaxed) % pool.len();
+        Ok(pool[idx].clone())
+    }
+
     pub async fn report_failure(&self, profile: &str) {
-        let mut set = self.blocked_profiles.write().await;
-        set.insert(profile.to_string());
+        let mut map = self.blocked_profiles.write().await;
+        map.insert(profile.to_string(), Instant::now());
     }
 }
 

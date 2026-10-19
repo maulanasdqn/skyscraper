@@ -82,13 +82,21 @@ async fn proxy_auto_avoids_failed_carrier() {
         make_carrier("tmobile", "US", true),
         make_carrier("att", "US", true),
     ]);
-    selector
-        .report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080")
-        .await;
+    for _ in 0..20 {
+        selector
+            .report_failure("socks5://tmobile-some-uuid:secret@proxy.local:1080")
+            .await;
+    }
     let req = make_request(ProxyStrategy::Auto, ProfileStrategy::Auto, None);
-    let url = selector.select(&req).await.unwrap().unwrap();
+    let mut att_count = 0;
+    for _ in 0..10 {
+        let url = selector.select(&req).await.unwrap().unwrap();
+        if url.starts_with("socks5://att-") {
+            att_count += 1;
+        }
+    }
     assert!(
-        url.starts_with("socks5://att-"),
-        "should prefer att over failed tmobile, got: {url}"
+        att_count >= 8,
+        "should strongly prefer att over failed tmobile, att picked {att_count}/10"
     );
 }

@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod circuit_breaker;
 pub mod clients;
+pub mod content_validator;
 pub mod dedup;
 pub mod domain_throttle;
 pub mod intelligence;
