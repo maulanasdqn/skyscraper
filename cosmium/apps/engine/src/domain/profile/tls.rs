@@ -82,7 +82,7 @@ mod tests {
         let tls = Tls::default();
         let mut f = Vec::new();
         tls.push_flags(&mut f);
-        assert!(f.is_empty());
+        assert_eq!(f.len(), 0);
     }
 
     #[test]

@@ -62,7 +62,7 @@ async fn list_jobs_empty() {
 
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp.into_body()).await;
-    assert!(body["data"].as_array().unwrap().is_empty());
+    assert_eq!(body["data"].as_array().unwrap().len(), 0);
     assert_eq!(body["pagination"]["page"], 1);
     assert_eq!(body["pagination"]["total"], 0);
 }

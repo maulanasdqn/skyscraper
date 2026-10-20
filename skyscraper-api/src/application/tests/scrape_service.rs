@@ -120,7 +120,7 @@ async fn submit_job_scheduled() {
         )
         .await
         .unwrap();
-    assert!(queue.enqueued.lock().unwrap().is_empty());
+    assert_eq!(queue.enqueued.lock().unwrap().len(), 0);
     let scheduled = queue.scheduled.lock().unwrap();
     assert_eq!(scheduled.len(), 1);
     assert_eq!(scheduled[0].0, job.id);
@@ -169,7 +169,7 @@ async fn cancel_job_pending() {
         .await
         .unwrap();
     svc.cancel_job(tenant.id, job.id).await.unwrap();
-    assert!(repo.jobs.lock().unwrap().is_empty());
+    assert_eq!(repo.jobs.lock().unwrap().len(), 0);
 }
 
 #[tokio::test]

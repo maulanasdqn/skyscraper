@@ -60,9 +60,9 @@ mod tests {
             assert!(!req.screenshot);
             assert!(!req.include_html);
             assert!(!req.headful);
-            assert!(req.extract.is_empty());
+            assert_eq!(req.extract.len(), 0);
             assert!(req.script.is_none());
-            assert!(req.workflow.is_empty());
+            assert_eq!(req.workflow.len(), 0);
             assert!(req.geo.is_none());
             assert!(matches!(req.proxy_strategy, ProxyStrategy::Auto));
             assert!(matches!(req.profile_strategy, ProfileStrategy::Auto));

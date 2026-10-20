@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn keeps_everything_when_unlimited() {
         let entries = vec![entry("a", 0), entry("b", 900)];
-        assert!(expired_ids(&entries, Retention::unlimited(), NOW).is_empty());
+        assert_eq!(expired_ids(&entries, Retention::unlimited(), NOW).len(), 0);
     }
 
     #[test]
@@ -113,12 +113,12 @@ mod tests {
             max_results: 2,
             max_age_days: 0,
         };
-        assert!(expired_ids(&entries, policy, NOW).is_empty());
+        assert_eq!(expired_ids(&entries, policy, NOW).len(), 0);
     }
 
     #[test]
     fn handles_empty_input() {
-        assert!(expired_ids(&[], Retention::default(), NOW).is_empty());
+        assert_eq!(expired_ids(&[], Retention::default(), NOW).len(), 0);
     }
 
     #[test]

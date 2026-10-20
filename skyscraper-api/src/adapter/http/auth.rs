@@ -74,6 +74,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 impl FromRequestParts<Arc<AppState>> for AdminAuth {
     type Rejection = Response;
 
+    #[allow(unknown_lints, clippy::unused_async, clippy::unused_async_trait_impl)]
     async fn from_request_parts(
         parts: &mut Parts,
         state: &Arc<AppState>,

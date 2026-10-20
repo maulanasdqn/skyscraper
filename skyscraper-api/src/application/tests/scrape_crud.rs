@@ -94,7 +94,7 @@ async fn cancel_job_pending() {
         .await
         .unwrap();
     svc.cancel_job(tenant.id, job.id).await.unwrap();
-    assert!(repo.jobs.lock().unwrap().is_empty());
+    assert_eq!(repo.jobs.lock().unwrap().len(), 0);
 }
 
 #[tokio::test]

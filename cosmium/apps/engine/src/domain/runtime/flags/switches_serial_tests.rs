@@ -17,7 +17,7 @@ fn voices_switch_is_valid_json() {
     let json = flag_value(&flags, "--cosmium-voices=");
     let parsed: Vec<serde_json::Value> =
         serde_json::from_str(json).expect("voices must be valid JSON");
-    assert!(!parsed.is_empty());
+    assert_ne!(parsed.len(), 0);
 }
 
 #[test]
@@ -33,5 +33,5 @@ fn media_devices_switch_is_valid_json() {
     let json = flag_value(&flags, "--cosmium-media-devices=");
     let parsed: Vec<serde_json::Value> =
         serde_json::from_str(json).expect("media_devices must be valid JSON");
-    assert!(!parsed.is_empty());
+    assert_ne!(parsed.len(), 0);
 }

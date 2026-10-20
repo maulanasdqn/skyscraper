@@ -139,7 +139,7 @@ mod tests {
     fn depth_zero_returns_empty() {
         let html = r#"<a href="/page">Page</a>"#;
         let links = extract_links(html, "https://example.com", "https://example.com", 0);
-        assert!(links.is_empty());
+        assert_eq!(links.len(), 0);
     }
 
     #[test]
