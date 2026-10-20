@@ -56,10 +56,7 @@ pub async fn create_crawl(
     Ok(ok(crawl_id, job_ids))
 }
 
-fn ok(
-    crawl_id: uuid::Uuid,
-    job_ids: Vec<uuid::Uuid>,
-) -> (StatusCode, Json<CrawlResponse>) {
+fn ok(crawl_id: uuid::Uuid, job_ids: Vec<uuid::Uuid>) -> (StatusCode, Json<CrawlResponse>) {
     let pages = job_ids.len() as u32;
     (
         StatusCode::CREATED,
@@ -88,8 +85,7 @@ fn build_request(body: &CrawlRequest, url: &str) -> ScrapeJobRequest {
 }
 
 async fn wait_for_html(state: &AppState, job_id: uuid::Uuid) -> String {
-    let deadline =
-        tokio::time::Instant::now() + std::time::Duration::from_secs(90);
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(90);
     let mut interval = std::time::Duration::from_millis(200);
 
     while tokio::time::Instant::now() < deadline {
@@ -100,8 +96,7 @@ async fn wait_for_html(state: &AppState, job_id: uuid::Uuid) -> String {
             match job.status {
                 JobStatus::Completed => {
                     if let Some(result) = &job.result {
-                        if let Some(html) = result.get("html").and_then(|v| v.as_str())
-                        {
+                        if let Some(html) = result.get("html").and_then(|v| v.as_str()) {
                             return html.to_string();
                         }
                     }

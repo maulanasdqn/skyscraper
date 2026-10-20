@@ -3,12 +3,12 @@ mod proxies;
 mod users;
 
 use topcoat::{
-    Result,
-    context::{Cx, app_context},
+    context::{app_context, Cx},
     htmx::hx_request,
     router::{layout, request},
     tailwind,
     view::{component, view},
+    Result,
 };
 
 use crate::api::ApiClient;
@@ -22,9 +22,15 @@ async fn root(cx: &Cx, slot: Result) -> Result {
     let api = app_context::<ApiClient>(cx);
     let online = api.health().await;
     let (badge, badge_cls) = if online {
-        ("Online", "text-xs px-2 py-1 rounded bg-emerald-900 text-emerald-400")
+        (
+            "Online",
+            "text-xs px-2 py-1 rounded bg-emerald-900 text-emerald-400",
+        )
     } else {
-        ("Offline", "text-xs px-2 py-1 rounded bg-red-900 text-red-400")
+        (
+            "Offline",
+            "text-xs px-2 py-1 rounded bg-red-900 text-red-400",
+        )
     };
     let path = request::uri(cx).path().to_string();
 

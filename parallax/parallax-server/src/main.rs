@@ -40,8 +40,12 @@ async fn main() {
         match config.credentials {
             Some((user, pass)) => {
                 info!(addr = %listen_addr, "starting with password auth");
-                let socks = SocksHandler::new(PasswordAuthenticator::new(user.clone(), pass.clone()), connector);
-                let http = HttpHandler::new(Some((user, pass)), DirectConnector::new(TokioResolver));
+                let socks = SocksHandler::new(
+                    PasswordAuthenticator::new(user.clone(), pass.clone()),
+                    connector,
+                );
+                let http =
+                    HttpHandler::new(Some((user, pass)), DirectConnector::new(TokioResolver));
                 serve(listen_addr, ProtocolHandler::new(socks, http)).await;
             }
             None => {

@@ -10,7 +10,7 @@ use crate::domain::entity::{ProfileStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
 use crate::domain::port::{ProfileSelection, ScrapeClient};
 
-const BLOCK_TTL: Duration = Duration::from_secs(30 * 60);
+const BLOCK_TTL: Duration = Duration::from_mins(30);
 
 pub struct ProfileRotator {
     scrape_client: Arc<dyn ScrapeClient>,
@@ -52,9 +52,14 @@ impl ProfileRotator {
         let mut blocked = self.blocked_profiles.write().await;
         blocked.retain(|_, ts| now.duration_since(*ts) < BLOCK_TTL);
 
-        let available: Vec<_> = profiles.iter().filter(|p| !blocked.contains_key(*p)).collect();
+        let available: Vec<_> = profiles
+            .iter()
+            .filter(|p| !blocked.contains_key(*p))
+            .collect();
 
-        let pool = if available.is_empty() { &profiles } else {
+        let pool = if available.is_empty() {
+            &profiles
+        } else {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed) % available.len();
             return Ok(available[idx].clone());
         };

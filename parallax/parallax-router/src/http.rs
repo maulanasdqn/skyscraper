@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use parallax_core::{ConnectionHandler, ProxyError, Result, TargetAddr};
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional};
+use tokio::io::{copy_bidirectional, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tracing::info;
 
-use crate::{RouteResolver, UpstreamConnector, parse_username};
+use crate::{parse_username, RouteResolver, UpstreamConnector};
 
 pub struct RoutingHttpHandler<R: RouteResolver, U: UpstreamConnector> {
     resolver: Arc<R>,
@@ -14,7 +14,10 @@ pub struct RoutingHttpHandler<R: RouteResolver, U: UpstreamConnector> {
 
 impl<R: RouteResolver, U: UpstreamConnector> RoutingHttpHandler<R, U> {
     pub fn new(resolver: Arc<R>, connector: Arc<U>) -> Self {
-        Self { resolver, connector }
+        Self {
+            resolver,
+            connector,
+        }
     }
 
     async fn read_headers(stream: &mut TcpStream) -> Result<String> {
@@ -34,9 +37,7 @@ impl<R: RouteResolver, U: UpstreamConnector> RoutingHttpHandler<R, U> {
 
     fn extract_credentials(headers: &str) -> Result<(String, String)> {
         for line in headers.lines() {
-            if line.len() > 27
-                && line[..27].eq_ignore_ascii_case("proxy-authorization: basic ")
-            {
+            if line.len() > 27 && line[..27].eq_ignore_ascii_case("proxy-authorization: basic ") {
                 let encoded = line[27..].trim();
                 let decoded = base64_decode(encoded).ok_or(ProxyError::AuthFailed)?;
                 let text = String::from_utf8(decoded).map_err(|_| ProxyError::AuthFailed)?;
@@ -48,9 +49,8 @@ impl<R: RouteResolver, U: UpstreamConnector> RoutingHttpHandler<R, U> {
     }
 
     async fn send_error(stream: &mut TcpStream, status: u16, reason: &str) {
-        let resp = format!(
-            "HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        );
+        let resp =
+            format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         let _ = stream.write_all(resp.as_bytes()).await;
     }
 
@@ -105,7 +105,10 @@ impl<R: RouteResolver + 'static, U: UpstreamConnector + 'static> ConnectionHandl
         if method.eq_ignore_ascii_case("CONNECT") {
             let (host, port) = parse_authority(url)?;
             info!(%carrier, %upstream, "chaining http connect");
-            let mut chained = self.connector.connect(upstream, TargetAddr::Domain(host), port).await?;
+            let mut chained = self
+                .connector
+                .connect(upstream, TargetAddr::Domain(host), port)
+                .await?;
             stream
                 .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 .await?;

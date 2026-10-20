@@ -10,9 +10,9 @@ pub fn validate_scrape_url(url: &str) -> Result<(), DomainError> {
     }
 
     if url.len() > MAX_URL_LENGTH {
-        return Err(DomainError::InvalidInput(
-            format!("url exceeds maximum length of {MAX_URL_LENGTH}"),
-        ));
+        return Err(DomainError::InvalidInput(format!(
+            "url exceeds maximum length of {MAX_URL_LENGTH}"
+        )));
     }
 
     if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -43,7 +43,9 @@ pub fn validate_email(email: &str) -> Result<(), DomainError> {
         return Err(DomainError::InvalidInput("invalid email format".into()));
     }
     if email.contains(' ') || email.contains('\n') || email.contains('\r') {
-        return Err(DomainError::InvalidInput("email contains invalid characters".into()));
+        return Err(DomainError::InvalidInput(
+            "email contains invalid characters".into(),
+        ));
     }
     Ok(())
 }
@@ -60,8 +62,8 @@ pub fn validate_webhook_url(url: &str) -> Result<(), DomainError> {
             "webhook url must use https".into(),
         ));
     }
-    let host = extract_host(url)
-        .ok_or_else(|| DomainError::InvalidInput("invalid webhook url".into()))?;
+    let host =
+        extract_host(url).ok_or_else(|| DomainError::InvalidInput("invalid webhook url".into()))?;
     if is_private_host(&host) {
         return Err(DomainError::InvalidInput(
             "webhook to private/internal addresses is not allowed".into(),

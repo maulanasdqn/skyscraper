@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use uuid::Uuid;
-use zod_rs::prelude::*;
 
 use crate::domain::entity::{Carrier, CreateUserInput, Plan, Session, User};
 use crate::domain::port::{
@@ -22,7 +21,12 @@ impl AppService {
         carriers: Arc<dyn CarrierRepository>,
         sessions: Arc<dyn SessionRepository>,
     ) -> Self {
-        Self { users, plans, carriers, sessions }
+        Self {
+            users,
+            plans,
+            carriers,
+            sessions,
+        }
     }
 
     pub async fn list_users(&self) -> Result<Vec<User>> {
@@ -30,8 +34,8 @@ impl AppService {
     }
 
     pub async fn create_user(&self, payload: &serde_json::Value) -> Result<User> {
-        let input = CreateUserInput::validate_and_parse(payload)
-            .map_err(|e| format!("validation: {e}"))?;
+        let input =
+            CreateUserInput::validate_and_parse(payload).map_err(|e| format!("validation: {e}"))?;
         let plan_id: Uuid = input.plan_id.parse().map_err(|_| "invalid plan_id")?;
         self.users.create(input.email, plan_id).await
     }

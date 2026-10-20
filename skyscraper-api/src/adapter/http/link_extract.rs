@@ -1,11 +1,6 @@
 use std::collections::HashSet;
 
-pub fn extract_links(
-    html: &str,
-    base_url: &str,
-    start_url: &str,
-    max_depth: u32,
-) -> Vec<String> {
+pub fn extract_links(html: &str, base_url: &str, start_url: &str, max_depth: u32) -> Vec<String> {
     if max_depth == 0 || html.is_empty() {
         return Vec::new();
     }
@@ -98,9 +93,8 @@ fn regex_href(html: &str) -> Vec<&str> {
 fn is_asset(url: &str) -> bool {
     let lower = url.to_lowercase();
     let exts = [
-        ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico", ".css",
-        ".js", ".pdf", ".zip", ".woff", ".woff2", ".ttf", ".otf", ".mp4",
-        ".mp3", ".avi", ".xml",
+        ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico", ".css", ".js", ".pdf", ".zip",
+        ".woff", ".woff2", ".ttf", ".otf", ".mp4", ".mp3", ".avi", ".xml",
     ];
     exts.iter().any(|ext| lower.ends_with(ext))
 }
@@ -136,23 +130,25 @@ mod tests {
         assert!(links.contains(&"https://example.com/products".to_string()));
         assert!(links.contains(&"https://example.com/single-quotes".to_string()));
         assert!(!links.iter().any(|l| l.contains("other.com")));
-        assert!(!links.iter().any(|l| l.ends_with(".png")));
+        assert!(!links.iter().any(|l| std::path::Path::new(l)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))));
     }
 
     #[test]
     fn depth_zero_returns_empty() {
-        let html = r##"<a href="/page">Page</a>"##;
+        let html = r#"<a href="/page">Page</a>"#;
         let links = extract_links(html, "https://example.com", "https://example.com", 0);
         assert!(links.is_empty());
     }
 
     #[test]
     fn deduplicates_links() {
-        let html = r##"
+        let html = r#"
             <a href="/about">About</a>
             <a href="/about">About again</a>
             <a href="/about/">Trailing slash</a>
-        "##;
+        "#;
         let links = extract_links(html, "https://example.com", "https://example.com", 2);
         let about_count = links.iter().filter(|l| l.contains("about")).count();
         assert_eq!(about_count, 1);

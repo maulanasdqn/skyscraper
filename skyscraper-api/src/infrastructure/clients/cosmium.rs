@@ -171,7 +171,8 @@ impl CosmiumClient {
     async fn fetch_profiles(&self) -> Result<Vec<String>, DomainError> {
         let resp = self
             .request_builder(
-                self.client.get(format!("{}/api/v1/profiles", self.base_url)),
+                self.client
+                    .get(format!("{}/api/v1/profiles", self.base_url)),
             )
             .send()
             .await
@@ -190,7 +191,10 @@ impl CosmiumClient {
             .map_err(|e| DomainError::Upstream(format!("cosmium profiles decode: {e}")))?;
 
         if let Some(arr) = body.get("profiles").and_then(|v| v.as_array()) {
-            Ok(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            Ok(arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect())
         } else if let Ok(list) = serde_json::from_value::<Vec<String>>(body) {
             Ok(list)
         } else {

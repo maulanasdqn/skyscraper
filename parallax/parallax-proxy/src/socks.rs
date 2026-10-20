@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use parallax_core::{
-    AddressResolver, AuthMethod, Authenticator, Command, ConnectionHandler, Connector, ProxyError,
-    Reply, Result, TargetAddr, SOCKS_VERSION, write_reply,
+    write_reply, AddressResolver, AuthMethod, Authenticator, Command, ConnectionHandler, Connector,
+    ProxyError, Reply, Result, TargetAddr, SOCKS_VERSION,
 };
 use std::net::SocketAddr;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional};
+use tokio::io::{copy_bidirectional, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 const RELAY_TIMEOUT: Duration = Duration::from_secs(300);
@@ -125,9 +125,7 @@ impl<A: Authenticator, C: Connector> SocksHandler<A, C> {
 
         let required = self.authenticator.method();
         if methods.contains(&(required as u8)) {
-            stream
-                .write_all(&[SOCKS_VERSION, required as u8])
-                .await?;
+            stream.write_all(&[SOCKS_VERSION, required as u8]).await?;
             self.authenticator.authenticate(stream).await
         } else {
             stream
@@ -151,23 +149,22 @@ impl<A: Authenticator, C: Connector> SocksHandler<A, C> {
         let fallback: SocketAddr = ([0, 0, 0, 0], 0).into();
 
         match cmd {
-            Command::Connect => {
-                match self.connector.connect(addr, port).await {
-                    Ok(mut target) => {
-                        let bind = target.local_addr().unwrap_or(fallback);
-                        write_reply(stream, Reply::Succeeded, bind).await?;
-                        let _ = tokio::time::timeout(
-                            RELAY_TIMEOUT,
-                            copy_bidirectional(stream, &mut target),
-                        ).await;
-                        Ok(())
-                    }
-                    Err(e) => {
-                        let _ = write_reply(stream, Reply::ConnectionRefused, fallback).await;
-                        Err(e)
-                    }
+            Command::Connect => match self.connector.connect(addr, port).await {
+                Ok(mut target) => {
+                    let bind = target.local_addr().unwrap_or(fallback);
+                    write_reply(stream, Reply::Succeeded, bind).await?;
+                    let _ = tokio::time::timeout(
+                        RELAY_TIMEOUT,
+                        copy_bidirectional(stream, &mut target),
+                    )
+                    .await;
+                    Ok(())
                 }
-            }
+                Err(e) => {
+                    let _ = write_reply(stream, Reply::ConnectionRefused, fallback).await;
+                    Err(e)
+                }
+            },
             _ => {
                 let _ = write_reply(stream, Reply::CommandNotSupported, fallback).await;
                 Err(ProxyError::UnsupportedCommand)
@@ -177,9 +174,7 @@ impl<A: Authenticator, C: Connector> SocksHandler<A, C> {
 }
 
 #[async_trait]
-impl<A: Authenticator + 'static, C: Connector + 'static> ConnectionHandler
-    for SocksHandler<A, C>
-{
+impl<A: Authenticator + 'static, C: Connector + 'static> ConnectionHandler for SocksHandler<A, C> {
     async fn handle(&self, mut stream: TcpStream) -> Result<()> {
         self.negotiate(&mut stream).await?;
         self.relay(&mut stream).await

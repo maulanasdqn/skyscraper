@@ -99,7 +99,5 @@ pub async fn list_all_jobs(
         .list_all(q.status, q.tenant_id, per_page, offset)
         .await?;
     let total = state.job_repo.count_all(q.status, q.tenant_id).await?;
-    Ok(Json(PaginatedResponse::new(
-        jobs, page, per_page, total,
-    )))
+    Ok(Json(PaginatedResponse::new(jobs, page, per_page, total)))
 }

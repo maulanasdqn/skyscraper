@@ -1,9 +1,9 @@
 use axum::{
-    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, patch, post},
+    Json, Router,
 };
 use serde::Serialize;
 use uuid::Uuid;
@@ -80,10 +80,7 @@ async fn toggle(State(svc): State<AppService>, Path(id): Path<Uuid>) -> StatusCo
     StatusCode::OK
 }
 
-async fn regenerate(
-    State(svc): State<AppService>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn regenerate(State(svc): State<AppService>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match svc.regenerate_key(id).await {
         Ok(Some(key)) => Json(serde_json::json!({"api_key": key})).into_response(),
         _ => StatusCode::NOT_FOUND.into_response(),

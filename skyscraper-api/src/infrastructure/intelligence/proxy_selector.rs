@@ -10,7 +10,7 @@ use crate::domain::entity::{ProxyStrategy, ScrapeJobRequest};
 use crate::domain::error::DomainError;
 use crate::domain::port::{CarrierClient, ProxySelection};
 
-const FAILURE_WINDOW: Duration = Duration::from_secs(30 * 60);
+const FAILURE_WINDOW: Duration = Duration::from_mins(30);
 
 pub struct ProxySelector {
     carrier_client: Arc<dyn CarrierClient>,
@@ -56,11 +56,12 @@ impl ProxySelector {
         }
     }
 
-    async fn select_auto(
-        &self,
-        request: &ScrapeJobRequest,
-    ) -> Result<Option<String>, DomainError> {
-        let carriers = self.carrier_client.list_carriers().await.unwrap_or_default();
+    async fn select_auto(&self, request: &ScrapeJobRequest) -> Result<Option<String>, DomainError> {
+        let carriers = self
+            .carrier_client
+            .list_carriers()
+            .await
+            .unwrap_or_default();
         let online: Vec<_> = carriers.iter().filter(|c| c.online).collect();
         if online.is_empty() {
             return Ok(None);

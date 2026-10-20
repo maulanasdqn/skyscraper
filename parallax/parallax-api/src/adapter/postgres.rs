@@ -15,7 +15,9 @@ pub struct PostgresRepo {
 
 impl PostgresRepo {
     pub async fn connect(url: &str) -> Self {
-        let pool = PgPool::connect(url).await.expect("failed to connect to database");
+        let pool = PgPool::connect(url)
+            .await
+            .expect("failed to connect to database");
         Self { pool }
     }
 
@@ -81,7 +83,11 @@ impl UserRepository for PostgresRepo {
             .bind(id)
             .execute(&self.pool)
             .await?;
-        Ok(if result.rows_affected() > 0 { Some(new_key) } else { None })
+        Ok(if result.rows_affected() > 0 {
+            Some(new_key)
+        } else {
+            None
+        })
     }
 }
 
@@ -118,16 +124,20 @@ impl SessionRepository for PostgresRepo {
     }
 
     async fn count_active(&self) -> Result<i64> {
-        Ok(sqlx::query("SELECT COUNT(*) as count FROM sessions WHERE ended_at IS NULL")
-            .fetch_one(&self.pool)
-            .await
-            .map(|r| r.get::<i64, _>("count"))?)
+        Ok(
+            sqlx::query("SELECT COUNT(*) as count FROM sessions WHERE ended_at IS NULL")
+                .fetch_one(&self.pool)
+                .await
+                .map(|r| r.get::<i64, _>("count"))?,
+        )
     }
 
     async fn total_bandwidth(&self) -> Result<i64> {
-        Ok(sqlx::query("SELECT COALESCE(SUM(bytes_up + bytes_down), 0) as total FROM sessions")
-            .fetch_one(&self.pool)
-            .await
-            .map(|r| r.get::<i64, _>("total"))?)
+        Ok(
+            sqlx::query("SELECT COALESCE(SUM(bytes_up + bytes_down), 0) as total FROM sessions")
+                .fetch_one(&self.pool)
+                .await
+                .map(|r| r.get::<i64, _>("total"))?,
+        )
     }
 }

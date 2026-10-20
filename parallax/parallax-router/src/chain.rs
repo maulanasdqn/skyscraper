@@ -16,9 +16,7 @@ impl UpstreamConnector for Socks5Chain {
         target: TargetAddr,
         port: u16,
     ) -> Result<TcpStream> {
-        let mut stream = TcpStream::connect(upstream)
-            .await
-            .map_err(ProxyError::Io)?;
+        let mut stream = TcpStream::connect(upstream).await.map_err(ProxyError::Io)?;
 
         stream.write_all(&[0x05, 0x01, 0x00]).await?;
         let mut greeting = [0u8; 2];

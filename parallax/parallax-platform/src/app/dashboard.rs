@@ -1,8 +1,8 @@
 use topcoat::{
-    Result,
-    context::{Cx, app_context},
+    context::{app_context, Cx},
     router::page,
     view::{component, view},
+    Result,
 };
 
 use crate::api::ApiClient;
@@ -16,9 +16,18 @@ async fn home(cx: &Cx) -> Result {
 
     let user_count = users.len().to_string();
     let active = sessions.iter().filter(|s| s.active).count().to_string();
-    let bw = format_bytes(sessions.iter().map(|s| (s.bytes_up + s.bytes_down) as u64).sum());
+    let bw = format_bytes(
+        sessions
+            .iter()
+            .map(|s| (s.bytes_up + s.bytes_down) as u64)
+            .sum(),
+    );
     let online = carriers.iter().filter(|c| c.online).count();
-    let carrier_text = if online > 0 { format!("{online} online") } else { "Direct only".into() };
+    let carrier_text = if online > 0 {
+        format!("{online} online")
+    } else {
+        "Direct only".into()
+    };
 
     view! {
         <div>

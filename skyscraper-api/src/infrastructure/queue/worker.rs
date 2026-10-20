@@ -91,19 +91,14 @@ impl Worker {
         loop {
             if *self.shutdown_rx.borrow() {
                 info!("worker shutting down, waiting for in-flight jobs");
-                let _ = semaphore
-                    .acquire_many(self.concurrency as u32)
-                    .await;
+                let _ = semaphore.acquire_many(self.concurrency as u32).await;
                 info!("all in-flight jobs finished");
                 break;
             }
 
-            let permit = match semaphore.clone().try_acquire_owned() {
-                Ok(p) => p,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                    continue;
-                }
+            let Ok(permit) = semaphore.clone().try_acquire_owned() else {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                continue;
             };
 
             match self.queue.dequeue(2.0).await {

@@ -1,8 +1,8 @@
 use topcoat::{
-    Result,
-    context::{Cx, app_context},
+    context::{app_context, Cx},
     router::page,
-    view::{component, view},
+    view::view,
+    Result,
 };
 
 use crate::api::ApiClient;

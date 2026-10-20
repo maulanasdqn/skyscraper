@@ -111,9 +111,7 @@ pub async fn list_jobs(
         .job_repo
         .count_by_tenant(tenant.0.id, q.status)
         .await?;
-    Ok(Json(PaginatedResponse::new(
-        jobs, page, per_page, total,
-    )))
+    Ok(Json(PaginatedResponse::new(jobs, page, per_page, total)))
 }
 
 pub async fn get_job(

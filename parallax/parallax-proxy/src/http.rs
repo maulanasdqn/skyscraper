@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use parallax_core::{ConnectionHandler, Connector, ProxyError, Result, TargetAddr};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional};
+use tokio::io::{copy_bidirectional, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 const RELAY_TIMEOUT: Duration = Duration::from_secs(300);
@@ -14,7 +14,10 @@ pub struct HttpHandler<C: Connector> {
 
 impl<C: Connector> HttpHandler<C> {
     pub fn new(credentials: Option<(String, String)>, connector: C) -> Self {
-        Self { credentials, connector }
+        Self {
+            credentials,
+            connector,
+        }
     }
 
     async fn read_headers(stream: &mut TcpStream) -> Result<String> {
@@ -92,9 +95,8 @@ impl<C: Connector> HttpHandler<C> {
     }
 
     async fn send_error(stream: &mut TcpStream, status: u16, reason: &str) {
-        let resp = format!(
-            "HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        );
+        let resp =
+            format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         let _ = stream.write_all(resp.as_bytes()).await;
     }
 }
@@ -153,8 +155,7 @@ fn parse_url(url: &str) -> Result<(String, u16, String)> {
 }
 
 fn base64_encode(data: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(4 * (data.len() + 2) / 3);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;

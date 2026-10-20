@@ -118,11 +118,10 @@ pub async fn update_tenant(
         state.tenant_repo.set_webhook_url(id, url_opt).await?;
     }
     if body.rate_limit_rpm.is_some() || body.concurrent_limit.is_some() {
-        let current = state
-            .tenant_repo
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| crate::domain::error::DomainError::NotFound(format!("tenant {id}")))?;
+        let current =
+            state.tenant_repo.find_by_id(id).await?.ok_or_else(|| {
+                crate::domain::error::DomainError::NotFound(format!("tenant {id}"))
+            })?;
         let rpm = body.rate_limit_rpm.unwrap_or(current.rate_limit_rpm);
         let conc = body.concurrent_limit.unwrap_or(current.concurrent_limit);
         state.tenant_repo.set_limits(id, rpm, conc).await?;

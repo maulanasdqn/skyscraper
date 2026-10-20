@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod adapter;
 mod application;
 mod domain;

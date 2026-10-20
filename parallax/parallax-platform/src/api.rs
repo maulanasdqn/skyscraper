@@ -35,7 +35,10 @@ pub struct SessionDto {
 
 impl ApiClient {
     pub fn new(base: String) -> Self {
-        Self { base, http: reqwest::Client::new() }
+        Self {
+            base,
+            http: reqwest::Client::new(),
+        }
     }
 
     pub async fn health(&self) -> bool {

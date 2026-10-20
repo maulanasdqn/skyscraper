@@ -36,7 +36,10 @@ impl IntoResponse for ApiError {
             ),
             DomainError::Upstream(msg) => {
                 tracing::warn!("upstream error: {msg}");
-                (StatusCode::BAD_GATEWAY, "upstream service unavailable".to_string())
+                (
+                    StatusCode::BAD_GATEWAY,
+                    "upstream service unavailable".to_string(),
+                )
             }
             DomainError::Internal(err) => {
                 tracing::error!("internal error: {err:#}");

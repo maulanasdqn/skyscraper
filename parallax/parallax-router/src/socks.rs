@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use parallax_core::{
-    Command, ConnectionHandler, ProxyError, Reply, Result, TargetAddr, SOCKS_VERSION, write_reply,
+    write_reply, Command, ConnectionHandler, ProxyError, Reply, Result, TargetAddr, SOCKS_VERSION,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional};
+use tokio::io::{copy_bidirectional, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tracing::info;
 
-use crate::{RouteResolver, UpstreamConnector, parse_username};
+use crate::{parse_username, RouteResolver, UpstreamConnector};
 
 pub struct RoutingSocksHandler<R: RouteResolver, U: UpstreamConnector> {
     resolver: Arc<R>,
@@ -17,7 +17,10 @@ pub struct RoutingSocksHandler<R: RouteResolver, U: UpstreamConnector> {
 
 impl<R: RouteResolver, U: UpstreamConnector> RoutingSocksHandler<R, U> {
     pub fn new(resolver: Arc<R>, connector: Arc<U>) -> Self {
-        Self { resolver, connector }
+        Self {
+            resolver,
+            connector,
+        }
     }
 
     async fn authenticate(&self, stream: &mut TcpStream) -> Result<String> {
@@ -94,8 +97,7 @@ impl<R: RouteResolver + 'static, U: UpstreamConnector + 'static> ConnectionHandl
                         Ok(())
                     }
                     Err(e) => {
-                        let _ =
-                            write_reply(&mut stream, Reply::ConnectionRefused, fallback).await;
+                        let _ = write_reply(&mut stream, Reply::ConnectionRefused, fallback).await;
                         Err(e)
                     }
                 }
