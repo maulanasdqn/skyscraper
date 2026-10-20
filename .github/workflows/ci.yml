@@ -179,7 +179,7 @@ jobs:
         run: docker build -f skyscraper-worker/Dockerfile -t skyscraper-worker:ci .
 
       - name: Build UI image
-        run: docker build -f skyscraper-ui/Dockerfile -t skyscraper-ui:ci .
+        run: docker build -f skyscraper-ui/Dockerfile -t skyscraper-ui:ci skyscraper-ui/
 
       - name: Build Parallax image
         run: docker build -f parallax/Dockerfile -t parallax:ci parallax/
